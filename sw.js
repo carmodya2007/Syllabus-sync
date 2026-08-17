@@ -1,11 +1,11 @@
 /*
   Syllabus Sync — service worker
-  Caches the app shell (HTML/CSS/JS + pdf.js) so the app itself opens offline.
+  Caches the app shell (HTML/CSS/JS + pdf.js + mammoth.js) so the app itself opens offline.
   This does NOT sync or back up student data — all real data lives in
   window.storage / localStorage on-device, untouched by this file.
 */
 
-const CACHE_VERSION = "syllabus-sync-v3"; // bumped: parser rewrite (points-based weights, full-doc scanning)
+const CACHE_VERSION = "syllabus-sync-v5"; // bumped: fixed decimal-percent parsing, grade-scale/prose noise filtering, table-based point categories, room-reference false positives, paste-text garbage check
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -14,7 +14,8 @@ const APP_SHELL = [
   "./icon-512.png",
   "./apple-touch-icon.png",
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"
 ];
 
 self.addEventListener("install", (event)=>{
