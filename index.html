@@ -1,0 +1,2184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Syllabus Sync</title>
+
+<!-- PWA: manifest + theme -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4a3fb0">
+<link rel="icon" href="icon-192.png">
+
+<!-- iOS home-screen support (iOS does not read manifest.json for these) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Syllabus Sync">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+  :root{
+    --bg:#eef1f7;
+    --surface:#ffffff;
+    --surface-2:#f4f6fb;
+    --line:#dde2ee;
+    --ink:#1c2033;
+    --muted:#5b6178;
+    --indigo:#4a3fb0;
+    --indigo-dim:#efecfc;
+    --mint:#2fa876;
+    --mint-text:#227c57;
+    --mint-dim:#e5f7ef;
+    --amber:#c98a1c;
+    --amber-text:#8f6314;
+    --amber-dim:#fbf1de;
+    --crimson:#d64550;
+    --crimson-text:#bc3c46;
+    --crimson-dim:#fbe6e7;
+    --radius:14px;
+    --shadow: 0 2px 10px rgba(28,32,51,0.06), 0 1px 2px rgba(28,32,51,0.05);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{margin:0;font-weight:800;letter-spacing:-0.02em;}
+  button{font-family:inherit;cursor:pointer;}
+  .hide{display:none !important;}
+
+  /* ---------- APP SHELL ---------- */
+  #app{max-width:1180px;margin:0 auto;padding:20px 16px 70px;}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin-bottom:22px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .mark{
+    width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--indigo),#7a6ff0);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;
+    flex:none;
+  }
+  .brand h1{font-size:19px;}
+  .brand .tag{font-size:11px;color:var(--muted);font-weight:600;}
+  .topbar-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn{
+    border:none;border-radius:10px;padding:9px 15px;font-size:13px;font-weight:700;
+    display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn-primary{background:var(--indigo);color:#fff;box-shadow:var(--shadow);}
+  .btn-primary:hover{background:#3d33a0;}
+  .btn-ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line);}
+  .btn-ghost:hover{background:var(--surface-2);}
+  .btn-sm{padding:6px 11px;font-size:12px;}
+
+  /* ---------- ONBOARDING ---------- */
+  .onboard-hero{
+    background:linear-gradient(135deg,var(--indigo) 0%, #6a5fd6 100%);
+    border-radius:20px;padding:34px 28px;color:#fff;margin-bottom:24px;box-shadow:var(--shadow);
+  }
+  .onboard-hero h2{font-size:26px;margin-bottom:8px;}
+  .onboard-hero p{margin:0;opacity:0.9;font-size:14px;max-width:560px;line-height:1.55;}
+
+  .upload-box{
+    background:var(--surface);border:2px dashed var(--line);border-radius:var(--radius);
+    padding:30px 20px;text-align:center;transition:border-color .15s, background .15s;
+    cursor:pointer;
+  }
+  .upload-box.drag{border-color:var(--indigo);background:var(--indigo-dim);}
+  .upload-box .icon{font-size:30px;margin-bottom:8px;}
+  .upload-box h3{font-size:15px;margin-bottom:4px;}
+  .upload-box p{font-size:12.5px;color:var(--muted);margin:0 0 12px;}
+  .upload-box input[type=file]{display:none;}
+
+  .paste-toggle{
+    text-align:center;margin-top:10px;font-size:12.5px;color:var(--indigo);font-weight:700;
+    cursor:pointer;text-decoration:underline;
+  }
+  .upload-error{
+    margin-top:12px;padding:12px 14px;border-radius:10px;
+    background:var(--crimson-dim);border:1px solid var(--crimson);
+    color:var(--crimson-text);font-size:12.5px;line-height:1.5;font-weight:600;
+  }
+  .calendar-grid-warning{
+    margin-bottom:16px;padding:12px 14px;border-radius:10px;
+    background:var(--amber-dim);border:1px solid var(--amber);
+    color:var(--amber-text);font-size:12.5px;line-height:1.55;font-weight:600;
+  }
+  .paste-area{margin-top:10px;}
+  .paste-area textarea{
+    width:100%;min-height:140px;border-radius:10px;border:1px solid var(--line);padding:12px;
+    font-family:ui-monospace,monospace;font-size:12.5px;resize:vertical;
+  }
+
+  .class-setup-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow);
+  }
+  .class-setup-card .csc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .class-setup-card .csc-head h3{font-size:15px;}
+  .status-chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
+  .status-chip.parsed{background:var(--mint-dim);color:var(--mint-text);}
+  .status-chip.pending{background:var(--surface-2);color:var(--muted);}
+
+  .parsed-review{margin-top:14px;}
+  .field-row{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+  .field-row label{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);width:120px;flex:none;}
+  .field-row input[type=text]{
+    flex:1;min-width:160px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;
+  }
+
+  table.edit-table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12.5px;}
+  table.edit-table th{
+    text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);
+    padding:6px 6px;border-bottom:1px solid var(--line);
+  }
+  table.edit-table td{padding:5px 6px;border-bottom:1px solid var(--surface-2);}
+  table.edit-table input{width:100%;border:1px solid var(--line);border-radius:6px;padding:5px 7px;font-size:12.5px;}
+  table.edit-table input.num{width:70px;}
+  table.edit-table input.date{width:130px;}
+  .row-remove{
+    background:none;border:none;color:var(--crimson-text);font-size:14px;padding:10px 12px;
+    min-width:36px;min-height:36px;
+  }
+  .add-row-btn{
+    margin-top:6px;background:var(--surface-2);border:1px dashed var(--line);border-radius:8px;
+    padding:6px 12px;font-size:12px;color:var(--muted);font-weight:700;
+  }
+  .weight-warning{font-size:11.5px;color:var(--amber-text);margin-top:6px;font-weight:600;}
+  .weight-ok{font-size:11.5px;color:var(--mint-text);margin-top:6px;font-weight:600;}
+
+  .save-class-row{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+
+  .add-another{
+    background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius);
+    padding:16px;text-align:center;color:var(--muted);font-weight:700;font-size:13px;
+    cursor:pointer;margin-bottom:16px;
+  }
+  .add-another:hover{border-color:var(--indigo);color:var(--indigo);}
+
+  .target-setup{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;margin:22px 0;box-shadow:var(--shadow);
+  }
+  .target-setup h3{font-size:15px;margin-bottom:12px;}
+  .target-grid{display:flex;gap:14px;flex-wrap:wrap;}
+  .target-field{display:flex;flex-direction:column;gap:5px;min-width:150px;flex:1;}
+  .target-field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+  .target-field input,.target-field select{
+    border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:13px;
+  }
+  .finish-setup-row{text-align:center;margin-top:22px;}
+
+  /* ---------- DASHBOARD ---------- */
+  .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:18px;}
+  .tab-btn{
+    background:var(--surface);border:1px solid var(--line);border-radius:20px;
+    padding:8px 16px;font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap;flex:none;
+  }
+  .tab-btn.active{background:var(--indigo);color:#fff;border-color:var(--indigo);}
+  .tab-btn .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;}
+
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px;}
+  .metric{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;box-shadow:var(--shadow);
+  }
+  .metric.accent-indigo{border-left:3px solid var(--indigo);}
+  .metric.accent-amber{border-left:3px solid var(--amber);}
+  .metric.accent-crimson{border-left:3px solid var(--crimson);}
+  .metric.accent-mint{border-left:3px solid var(--mint);}
+  .metric .label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);}
+  .metric .value{font-size:22px;font-weight:800;margin-top:5px;}
+  .metric .detail{font-size:11.5px;color:var(--muted);margin-top:3px;}
+
+  .section-title{display:flex;align-items:center;gap:10px;margin:26px 0 12px;}
+  .section-title h2{font-size:15px;}
+  .section-title .rule{flex:1;height:1px;background:var(--line);}
+
+  /* ---------- THIS WEEK'S LOAD ---------- */
+  .load-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;box-shadow:var(--shadow);margin-bottom:20px;
+  }
+  .load-card .load-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+  .load-card .load-top h3{font-size:14px;}
+  .load-badge{font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px;text-transform:uppercase;letter-spacing:0.03em;}
+  .load-badge.light{background:var(--mint-dim);color:var(--mint-text);}
+  .load-badge.moderate{background:var(--amber-dim);color:var(--amber-text);}
+  .load-badge.heavy{background:var(--crimson-dim);color:var(--crimson-text);}
+  .load-badge.crunch{background:var(--crimson);color:#fff;}
+  .load-bar-track{height:10px;background:var(--surface-2);border-radius:6px;overflow:hidden;margin-bottom:8px;}
+  .load-bar-fill{height:100%;border-radius:6px;transition:width .4s ease;}
+  .load-detail{font-size:12px;color:var(--muted);}
+
+  /* ---------- EXPORT/IMPORT ---------- */
+  #importFileInput{display:none;}
+
+  /* ---------- ADD ASSIGNMENT (inline) ---------- */
+  .add-assignment-toggle{
+    background:var(--surface-2);border:1px dashed var(--line);border-radius:10px;
+    padding:9px 14px;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:12px;
+  }
+  .add-assignment-toggle:hover{border-color:var(--indigo);color:var(--indigo);}
+  .add-assignment-form{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow);
+  }
+  .aa-grid{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .aa-field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:140px;}
+  .aa-field label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);}
+  .aa-field input{border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:13px;width:100%;}
+  .aa-actions{display:flex;gap:8px;}
+
+  .course-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;margin-bottom:18px;border-top:3px solid var(--course-color,var(--indigo));
+  }
+  .cc-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);}
+  .cc-head h3{font-size:16px;}
+  .cc-head .full{font-size:11.5px;color:var(--muted);}
+  .pill{font-size:10.5px;font-weight:800;padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.03em;}
+  .pill.above{background:var(--mint-dim);color:var(--mint-text);}
+  .pill.track{background:var(--amber-dim);color:var(--amber-text);}
+  .pill.action{background:var(--crimson-dim);color:var(--crimson-text);}
+  .pill.nodata{background:var(--surface-2);color:var(--muted);}
+
+  .standing-row{display:flex;align-items:baseline;gap:10px;padding:16px 18px 6px;}
+  .standing-row .pct{font-size:34px;font-weight:800;color:var(--course-color,var(--indigo));}
+  .standing-row .letter{font-size:13px;color:var(--muted);}
+
+  .cat-row{display:grid;grid-template-columns:1.6fr 0.6fr 0.9fr;gap:8px;align-items:center;padding:8px 18px;font-size:13px;border-bottom:1px solid var(--surface-2);}
+  .cat-row .wt{color:var(--muted);font-size:11.5px;}
+  .cat-row input{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;width:100%;}
+  .buffer-box{margin:12px 18px;padding:12px 14px;background:var(--surface-2);border-radius:10px;font-size:12.5px;color:var(--muted);line-height:1.6;}
+  .buffer-box b{color:var(--ink);}
+  .cc-footer{display:flex;justify-content:flex-end;padding:0 18px 16px;gap:8px;}
+
+  .filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  .filters button{background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:700;}
+  .filters button.active{background:var(--indigo);color:#fff;border-color:var(--indigo);}
+
+  .ledger{display:flex;flex-direction:column;gap:8px;}
+  .item{
+    background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);
+    display:grid;grid-template-columns:22px 100px 1fr 90px 70px 90px;align-items:center;gap:10px;
+    padding:11px 14px;font-size:12.5px;
+  }
+  .item.done{opacity:0.45;}
+  .item.done .name{text-decoration:line-through;}
+  .check{
+    width:22px;height:22px;border-radius:6px;border:1.5px solid var(--muted);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--mint-text);
+    position:relative;
+  }
+  /* invisible padded hit area so the tap target is ~40px even though the visible box stays small */
+  .check::before{
+    content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:40px;height:40px;
+  }
+  .tag{font-size:9.5px;padding:3px 8px;border-radius:6px;font-weight:800;text-transform:uppercase;color:#fff;}
+  .urgency{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:800;text-align:center;}
+  .urgency.red{background:var(--crimson-dim);color:var(--crimson-text);}
+  .urgency.amber{background:var(--amber-dim);color:var(--amber-text);}
+  .urgency.green{background:var(--mint-dim);color:var(--mint-text);}
+  .weight-tag{font-size:11.5px;color:var(--muted);}
+  .weight-tag.high{color:var(--crimson-text);font-weight:800;}
+
+  .risk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;}
+  .risk-card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--crimson);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);}
+  .risk-card .wk{font-size:11px;color:var(--crimson-text);font-weight:800;text-transform:uppercase;}
+  .risk-card p{font-size:12px;color:var(--muted);margin:6px 0 0;line-height:1.5;}
+  .risk-empty{color:var(--muted);font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;text-align:center;}
+
+  .empty-state{
+    text-align:center;padding:40px 20px;color:var(--muted);background:var(--surface);
+    border-radius:var(--radius);border:1px dashed var(--line);
+  }
+
+  footer{margin-top:40px;text-align:center;color:var(--muted);font-size:11.5px;line-height:1.7;}
+
+  /* ---------- INSTALL BANNER ---------- */
+  .install-banner{
+    position:fixed;left:12px;right:12px;bottom:12px;z-index:998;
+    background:var(--ink);color:#fff;border-radius:14px;
+    padding:14px 16px;box-shadow:0 8px 26px rgba(20,22,40,0.35);
+    display:flex;align-items:center;gap:12px;max-width:520px;margin:0 auto;
+  }
+  .install-banner .ib-icon{
+    width:38px;height:38px;border-radius:10px;flex:none;
+    background:linear-gradient(135deg,var(--indigo),#7a6ff0);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px;
+  }
+  .install-banner .ib-body{flex:1;font-size:12.5px;line-height:1.45;}
+  .install-banner .ib-body b{display:block;font-size:13.5px;margin-bottom:2px;}
+  .install-banner .ib-actions{display:flex;flex-direction:column;gap:6px;flex:none;}
+  .install-banner button{
+    border:none;border-radius:8px;padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .install-banner .ib-install{background:#fff;color:var(--indigo);}
+  .install-banner .ib-dismiss{background:rgba(255,255,255,0.12);color:#fff;}
+  @media(max-width:420px){
+    .install-banner{flex-wrap:wrap;}
+    .install-banner .ib-actions{flex-direction:row;width:100%;justify-content:flex-end;}
+  }
+
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:10px 18px;border-radius:20px;font-size:12.5px;font-weight:600;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;z-index:999;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+
+  @media(max-width:600px){
+    .item{grid-template-columns:20px 76px 1fr;grid-template-rows:auto auto;}
+    .item .weight-tag, .item .urgency{grid-column:2/4;justify-self:start;}
+    .field-row label{width:100%;}
+    .btn, .tab-btn, .filters button{min-height:40px;padding-top:11px;padding-bottom:11px;}
+    .upload-box{padding:26px 14px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark">S</div>
+      <div>
+        <h1>Syllabus Sync</h1>
+        <div class="tag">your classes, your deadlines, one place</div>
+      </div>
+    </div>
+    <div class="topbar-actions" id="topActions"></div>
+  </div>
+
+  <div id="onboarding"></div>
+  <div id="dashboard" class="hide"></div>
+
+  <footer>
+    Your data is stored privately in your browser session for this app — no login, nothing shared with other students.<br>
+    Parsing is automated and won't always be perfect — always double-check dates and weights against the real syllabus before an exam.
+  </footer>
+</div>
+
+<div class="install-banner hide" id="installBanner"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   SYLLABUS SYNC — self-contained academic dashboard
+   ========================================================================= */
+
+const COLORS = ["#4a3fb0","#2f8fa8","#c9762c","#3a9e63","#a8406f","#5b6ee1","#c9a12c","#7a4fc9"];
+
+/* ---------- STATE ---------- */
+let classes = [];          // [{id,name,color,categories:[{label,weight}],assignments:[{id,name,date,weight}],scores:{label:num}}]
+let targets = { gpaFloor:"", perClass:{} }; // perClass: {classId: "A" or "90"}
+let completed = new Set();
+let draftClasses = [];     // classes being set up during onboarding (unsaved)
+let activeTab = "overview";
+let storageReady = false;
+
+const today = new Date(); // real "now" for a public generic tool
+
+/* ---------- STORAGE ADAPTER ----------
+   window.storage is Claude's own artifact-preview storage API — it only exists
+   when this file is rendered inside a Claude.ai artifact frame. Once this app
+   is published to GitHub Pages / Netlify / Vercel for real students to use,
+   window.storage will be undefined. This adapter uses window.storage when
+   present (in-Claude preview) and transparently falls back to localStorage
+   everywhere else (real deployment), keeping the exact same async
+   get/set/delete/list interface either way so the rest of the app doesn't
+   need to know which one it's talking to. */
+const LS_PREFIX = "syllabusSync:";
+const hasNativeStorage = (typeof window !== "undefined") && window.storage && typeof window.storage.get === "function";
+
+const storage = hasNativeStorage ? window.storage : {
+  async get(key, shared){
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    if(raw === null){ throw new Error("key not found: " + key); }
+    return { key, value: raw, shared: !!shared };
+  },
+  async set(key, value, shared){
+    localStorage.setItem(LS_PREFIX + key, value);
+    return { key, value, shared: !!shared };
+  },
+  async delete(key, shared){
+    localStorage.removeItem(LS_PREFIX + key);
+    return { key, deleted: true, shared: !!shared };
+  },
+  async list(prefix, shared){
+    const p = LS_PREFIX + (prefix || "");
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(p)).map(k => k.slice(LS_PREFIX.length));
+    return { keys, prefix, shared: !!shared };
+  }
+};
+
+/* ---------- STORAGE HELPERS ---------- */
+async function loadState(){
+  try{
+    const c = await storage.get('classes', false);
+    classes = c ? JSON.parse(c.value) : [];
+  }catch(e){ classes = []; }
+  try{
+    const t = await storage.get('targets', false);
+    targets = t ? JSON.parse(t.value) : { gpaFloor:"", perClass:{} };
+  }catch(e){ targets = { gpaFloor:"", perClass:{} }; }
+  try{
+    const d = await storage.get('completed', false);
+    completed = d ? new Set(JSON.parse(d.value)) : new Set();
+  }catch(e){ completed = new Set(); }
+  storageReady = true;
+}
+async function saveClasses(){
+  try{ await storage.set('classes', JSON.stringify(classes), false); }
+  catch(e){ showToast("Couldn't save — your last change may not persist."); }
+}
+async function saveTargets(){
+  try{ await storage.set('targets', JSON.stringify(targets), false); }
+  catch(e){ showToast("Couldn't save targets."); }
+}
+async function saveCompleted(){
+  try{ await storage.set('completed', JSON.stringify([...completed]), false); }
+  catch(e){ showToast("Couldn't save checklist state."); }
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+/* ---------- PARSING ---------- */
+/* ---------- FILE TYPE HANDLING ----------
+   Every unsupported format must fail LOUDLY with a specific message, never
+   silently — the original bug here was a binary file (.docx/.pptx/.xlsx)
+   getting read as raw text and its garbage bytes flowing straight into the
+   class name field with no warning at all. */
+
+class UnsupportedFileError extends Error {
+  constructor(message){ super(message); this.userMessage = message; }
+}
+
+const OFFICE_FORMAT_NAMES = {
+  ".pptx": "PowerPoint", ".ppt": "PowerPoint",
+  ".xlsx": "Excel", ".xls": "Excel",
+  ".doc": "old-format Word (.doc)",
+  ".odt": "OpenDocument", ".pages": "Pages", ".key": "Keynote", ".numbers": "Numbers",
+  ".rtf": "Rich Text", ".zip": "zip archive"
+};
+
+function getExtension(filename){
+  const m = filename.toLowerCase().match(/\.[a-z0-9]+$/);
+  return m ? m[0] : "";
+}
+
+// Word/PowerPoint/Excel/OpenDocument files are all ZIP containers under the hood —
+// this is the actual binary signature check, used as a safety net for files that
+// are mislabeled, extensionless, or a format we didn't think to name explicitly.
+async function looksLikeZipContainer(file){
+  const head = await file.slice(0, 4).arrayBuffer();
+  const bytes = new Uint8Array(head);
+  return bytes[0]===0x50 && bytes[1]===0x4B && (bytes[2]===0x03 || bytes[2]===0x05 || bytes[2]===0x07);
+}
+
+// Rough sanity check on plain-text extraction: real syllabus text should be almost
+// entirely printable characters. If a .txt-labeled file is secretly binary (e.g. a
+// renamed image or a corrupted export), this catches it instead of letting garbage
+// bytes reach the class name field.
+function looksLikeGarbageText(text){
+  if(text.length < 20) return false;
+  const sample = text.slice(0, 2000);
+  const nonPrintable = (sample.match(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\uFFFF]/g) || []).length;
+  return (nonPrintable / sample.length) > 0.05;
+}
+
+async function extractTextFromFile(file){
+  const ext = getExtension(file.name);
+
+  if(file.type === "application/pdf" || ext === ".pdf"){
+    const buf = await file.arrayBuffer();
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    let text = "";
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it=>it.str).join(" ") + "\n";
+    }
+    return text;
+  }
+
+  if(ext === ".docx" || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"){
+    if(typeof mammoth === "undefined"){
+      throw new UnsupportedFileError("Word file support didn't load correctly. Try 'paste text instead,' or reload the page and try again.");
+    }
+    const buf = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({arrayBuffer: buf});
+    return result.value;
+  }
+
+  if(OFFICE_FORMAT_NAMES[ext]){
+    throw new UnsupportedFileError(
+      `This looks like a ${OFFICE_FORMAT_NAMES[ext]} file — that format isn't supported yet. Try exporting it as a PDF, or use "paste text instead" below.`
+    );
+  }
+
+  if(ext === ".txt" || ext === "" || file.type.startsWith("text/")){
+    // Safety net: catch a ZIP-based Office file that's missing/wrong extension
+    // (e.g. a .docx renamed to .txt, or no extension at all) before treating it as text.
+    if(await looksLikeZipContainer(file)){
+      throw new UnsupportedFileError(
+        `This file looks like a Word/PowerPoint/Excel-style file, not plain text — that format isn't supported yet. Try exporting it as a PDF, or use "paste text instead" below.`
+      );
+    }
+    const text = await file.text();
+    if(looksLikeGarbageText(text)){
+      throw new UnsupportedFileError(
+        `This file doesn't look like readable text — it may be a format we can't parse yet. Try exporting it as a PDF, or use "paste text instead" below.`
+      );
+    }
+    return text;
+  }
+
+  throw new UnsupportedFileError(
+    `".${ext.replace(".","")}" files aren't supported yet. Try exporting as a PDF or .txt, or use "paste text instead" below.`
+  );
+}
+
+// Many PDF exports (this Missouri State template among them) render section headers
+// and calendar-table text in small-caps styling. PDF text extraction (pdf.js) then
+// splits each small-caps word into two separate runs — a normal-sized first letter,
+// then the rest as smaller synthetic capitals — and joins them with a space when
+// concatenating: "AUGUST" becomes "A UGUST", "COURSE" becomes "C OURSE". Left alone,
+// this silently breaks month-abbreviation matching across an entire calendar table
+// (every "AUG"/"SEPT"/"OCT" becomes unrecognizable) and garbles the class name and
+// section headers. This reconstructs the original word before any other parsing runs.
+function normalizeSmallCapsSpacing(text){
+  return text.replace(/\b([A-Z])\s+([A-Z]{2,})\b/g, "$1$2");
+}
+
+// Shared by guessClassName and the calendar-grid detector below — true only when
+// the document actually contains a recognizable course code near its start
+// (either "MED 274" style or "Economics 165" style), not a generic truthy check.
+function hasClearCourseCode(text){
+  const head = text.slice(0, 600);
+  return /\b([A-Z]{2,5})[\s\-]*(\d{2,4})\b/.test(head) || /\b([A-Z][a-z]+)\s+(\d{2,4})\s*:/.test(head);
+}
+
+// Detects a visual month-grid calendar (day-number boxes under MON/TUE/.../SUN
+// column headers) — a genuinely different shape from a table or bulleted list.
+// Flattening this to linear text loses which day-of-week each activity belongs
+// to, and these files typically carry no course code in their text at all (the
+// code usually lives only on the separate syllabus, not the calendar handout).
+// Both conditions are checked together so this can't misfire on an otherwise
+// normal syllabus that just happens to mention weekday abbreviations once.
+function looksLikeVisualCalendarGrid(text){
+  const hasWeekdayHeaderRow = /\bMON\b[\s\S]{0,20}\bTUE\b[\s\S]{0,20}\bWED\b[\s\S]{0,20}\bTHU\b[\s\S]{0,20}\bFRI\b[\s\S]{0,20}\bSAT\b[\s\S]{0,20}\bSUN\b/.test(text);
+  return hasWeekdayHeaderRow && !hasClearCourseCode(text);
+}
+
+function guessClassName(text, fallback){
+  // pdf.js only inserts a newline between PAGES, not between visual lines within a
+  // page — so treating "the first line" as a real line can mean grabbing an entire
+  // page's worth of glued-together text. Search directly for a course-code pattern
+  // ("MED 274", "MGT-286") and take a bounded window from there, cut at a natural
+  // boundary like "Fall 2026" or "Instructor" rather than a blind character cutoff.
+  // Scoped to near the start of the document — searching the whole text risks
+  // matching an unrelated later mention of the course code deep in the body (e.g.
+  // a "General Education" section restating "ECO 165" mid-paragraph).
+  const head = text.slice(0, 600);
+
+  function trimWindow(raw){
+    let window = raw;
+    window = window.split(/\b(?:Fall|Spring|Summer)\s+20\d{2}\b/i)[0];
+    window = window.split(/\bInstructor\b/i)[0];
+    window = window.split(/\bSection\s+\d{2,3}\b/i)[0]; // "Economics 165: ... Section 002"
+    window = window.replace(/\s{2,}/g," ").replace(/[\s:,\-–—]+$/,"").trim();
+    // pdf.js can also split a multi-digit course number the same way it splits
+    // small-caps words ("899" -> "89 9") — collapse whitespace strictly BETWEEN two
+    // digits back together. Scoped to this short class-name window only, since a
+    // longer document could legitimately have unrelated numbers sitting near each
+    // other (e.g. "Chapter 1 2026") where blindly merging digits would corrupt them.
+    window = window.replace(/(\d)\s+(?=\d)/g, "$1");
+    return window;
+  }
+
+  // Strategy 1: an ALL-CAPS course code abbreviation ("MED 274", "MGT-286").
+  const codeMatch = head.match(/\b([A-Z]{2,5})[\s\-]*(\d{2,4})\b[^.\n]{0,70}/);
+  if(codeMatch){
+    const window = trimWindow(codeMatch[0]);
+    if(window.length>=5) return window.slice(0,70);
+  }
+
+  // Strategy 2: a Title-Case department name instead of an abbreviation
+  // ("Economics 165: Principles of Microeconomics") — common when a syllabus
+  // spells the subject out rather than using its registrar code.
+  const titleCaseMatch = head.match(/\b([A-Z][a-z]+)\s+(\d{2,4})\s*:?[^.\n]{0,70}/);
+  if(titleCaseMatch){
+    const window = trimWindow(titleCaseMatch[0]);
+    if(window.length>=5) return window.slice(0,70);
+  }
+
+  const lines = text.split(/\n/).map(l=>l.trim()).filter(Boolean).slice(0,15);
+  // look for a course-code-like pattern e.g. "MED 274" or "MGT-286" near top
+  for(const l of lines){
+    const m = l.match(/\b([A-Z]{2,5})[\s\-]?(\d{2,4})\b/);
+    if(m && l.length < 80){ return l.replace(/–.*$/,"").trim().slice(0,60); }
+  }
+  return lines[0] ? lines[0].slice(0,60) : fallback;
+}
+
+/* ---------- CATEGORY / GRADING-WEIGHT PARSING ----------
+   Runs across the FULL syllabus text (not a section extract), because real
+   syllabi routinely state the grading breakdown in one section ("Grading
+   Breakdown", "Course Policies") and the dated schedule somewhere else
+   entirely ("Course Schedule", "Calendar", a table on a later page). Both
+   guessCategories() and guessAssignments() receive the whole document, so a
+   category weight and an assignment date can be found no matter how far
+   apart they sit in the file. */
+
+const LABEL_STOPWORDS = new Set(["a","an","the","to","of","and","or","will","receive","per","for","is","are","was","were","below","above","on","in","at","by","with","that","this","these","those","from","if","it","be","as","up","out"]);
+
+function isNoiseLabel(label){
+  if(/page|university|copyright|semester|chapter\s*\d|week\s*\d|out of|grand total|total points|total pts|^total$|^points?$|^pts$|^of$|^percent(age)?$/i.test(label)) return true;
+  // Footnote phrasing that explains a PER-ITEM point value ("A * indicates the
+  // assignment is worth 5 pts extra credit. All other assignments are worth 10
+  // points...") describes individual assignment weighting, not a real grading
+  // category — this pattern shows up often enough as a false positive that it's
+  // worth excluding by name rather than hoping the generic filters below catch it.
+  if(/\bindicates?\b|\ball other (assignments?|items?)\b|\bthe assignment (is|are)\b|\beach (assignment|item)\b|\bextra credit\b/i.test(label)) return true;
+  // A grade-scale cutoff table ("A = 90% to 100%", "B  80.0% to 89.9%", "F below 60%")
+  // uses a bare letter grade as the "label" — real grading categories are essentially
+  // never a single letter, so this is a reliable, cheap way to exclude the whole scale
+  // without needing to find a section heading first.
+  if(/^[A-F][+\-]?$/.test(label)) return true;
+  const words = label.toLowerCase().split(/\s+/).filter(Boolean);
+  if(words.length === 0) return true;
+  // Reject labels that are entirely grammatical filler ("The", "Below", "To 89") —
+  // real category names carry at least one real noun/word.
+  if(words.every(w => LABEL_STOPWORDS.has(w) || /^\d+$/.test(w))) return true;
+  // Reject labels that read like a clipped sentence fragment rather than a short
+  // category name. A ratio check (not a bare word-count cap) is what's needed here —
+  // a real category can legitimately run long ("Lab, Group, and Guest Speaker
+  // Activities (Brightspace)" is 7 words with only one filler word), while policy
+  // prose caught mid-sentence ("...will receive a") is short but filler-heavy.
+  if(words.length > 9) return true;
+  // Bare numbers are deliberately EXCLUDED from this ratio (unlike the all-filler
+  // check above) — a real category can legitimately end in a number ("Section 3",
+  // "Exam 1"), and counting that digit as filler wrongly pushed labels like
+  // "Comprehensive Exam With Focus On Section 3" over the rejection threshold.
+  const stopwordCount = words.filter(w => LABEL_STOPWORDS.has(w)).length;
+  if(words.length >= 4 && (stopwordCount / words.length) >= 0.4) return true;
+  if(/deduction|penalty|per day|late|reduce[sd]?\b/i.test(label)) return true;
+  return false;
+}
+
+function cleanLabel(raw){
+  let label = raw.trim().replace(/\s{2,}/g," ");
+  // strip trailing filler connective words that free-text phrasing like
+  // "Labs are worth 25 percent" pulls into the label (repeat: multiple fillers can stack)
+  const fillerTail = /\s+(?:(?:is|are|was|were)\s+(?:worth|weighted at|weighted|counts? for|counted for|equals?)|is|are|was|were|worth|weighted at|weighted|counts? for|counted for|equals?)\s*$/i;
+  let prev;
+  do { prev = label; label = label.replace(fillerTail, ""); } while(label !== prev);
+  label = label.replace(/^(the|your|this|a|an)\s+/i, "");
+  // strip a leading table-header phrase that a missing line-break let bleed into the
+  // real category name — "PERCENTAGE OF FINAL GRADE Weekly Quizzes" -> "Weekly Quizzes"
+  label = label.replace(/^(graded\s+item\s+)?percentage\s+of\s+(the\s+)?final\s+grade\s+/i, "");
+  label = label.replace(/[=:\-–—]+$/, "").trim();
+  return label.trim().replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+function dedupeCategories(list){
+  const found = {};
+  list.forEach(({label, weight})=>{
+    const key = label.toLowerCase();
+    if(!found[key] || found[key].weight < weight){
+      found[key] = {label, weight};
+    }
+  });
+  return Object.values(found).slice(0,12);
+}
+
+// "Homework: 20%", "Homework.......20%", "Homework - 20 %", "Homework: 20 percent",
+// and decimal weights like "Homework: 12.5%" — the number is captured in FULL
+// (including the decimal portion) so a grade-scale cutoff like "89.9%" can't get
+// mis-read as weight "9" by only grabbing the digits right before the % sign.
+function extractPercentCategories(text){
+  const re = /([A-Za-z][A-Za-z0-9 &\/\-']{1,44}?)[\s.\-]*[:\-]?[\s.\-]*(\d{1,3}(?:\.\d{1,2})?)\s?(?:%|percent\b)/gi;
+  const out = [];
+  let m;
+  while((m = re.exec(text)) !== null){
+    const label = cleanLabel(m[1]);
+    const weight = parseFloat(m[2]);
+    if(weight<1 || weight>100) continue;
+    if(label.length<3 || /^\d+$/.test(label)) continue;
+    if(isNoiseLabel(label)) continue;
+    out.push({label, weight});
+  }
+  return out;
+}
+
+// "Homework (200 pts)", "Homework - 200 points", "Homework: 200pts", "Labs.......150 pts"
+// — an inline point value stated right next to its category, same line.
+// "Homework (200 pts)", "Homework - 200 points", "Homework: 200pts", "Labs.......150 pts"
+// — an inline point value stated right next to its category, same line. Also tolerates
+// ONE parenthetical group sitting between the label and the number ("Quizzes (Thurs.
+// 9/3; Thurs. 9/17; ...) 100 pts") — real syllabi commonly list each instance's due
+// date in parens right after the category name, before finally stating the point value.
+function extractPointCategories(text){
+  const re = /([A-Za-z][A-Za-z0-9 &\/\-']{1,44}?)[\s.\-]*[:\-]?[\s.\-]*(?:\([^)]{0,120}\)\s*)?\(?\s*(\d{1,4})\s?(?:pts?\.?|points?)\b\)?/gi;
+  const out = [];
+  let m;
+  while((m = re.exec(text)) !== null){
+    const label = cleanLabel(m[1]);
+    const points = parseInt(m[2],10);
+    if(points<1 || points>2000) continue;
+    if(label.length<3 || /^\d+$/.test(label)) continue;
+    if(isNoiseLabel(label)) continue;
+    out.push({label, weight: points}); // "weight" here is raw points until converted below
+  }
+  return out;
+}
+
+// Handles a grading breakdown that's a genuine TABLE where the extracted text lost
+// its columns — e.g. a Word table that flattens to one cell per line:
+//   Chapter Quizzes (Connect)
+//   10
+//   50
+// with no "pts"/"points" word anywhere near the number, and a "Points" column
+// header stated once at the top rather than repeated per row. This is common
+// enough in real syllabi (this exact shape came from a real ACC 201 file) that
+// it's worth a dedicated positional heuristic: walk label → count → points
+// triples until hitting a "Total Points" line, keeping the LAST number in each
+// triple (points), and skipping a row if the shape doesn't hold.
+function extractPointsTableCategories(text){
+  const rawLines = text.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const out = [];
+  let i = 0;
+  while(i < rawLines.length){
+    const line = rawLines[i];
+    if(/^total\s*points?\b/i.test(line)) break;
+    const looksLikeLabel = /[A-Za-z]{3,}/.test(line) && !/^(graded items|points?|#\s*of\s*(assignments?|items?)?)$/i.test(line);
+    if(looksLikeLabel && i+2 < rawLines.length){
+      const countLine = rawLines[i+1];
+      const pointsLine = rawLines[i+2];
+      const countOk = /^\d{1,4}$/.test(countLine) || /^tbd$/i.test(countLine);
+      const pointsNum = /^[\d,]{1,6}$/.test(pointsLine) ? parseInt(pointsLine.replace(/,/g,""),10) : null;
+      if(countOk && pointsNum!==null && pointsNum>0 && pointsNum<=3000){
+        const label = cleanLabel(line);
+        if(label.length>=3 && !isNoiseLabel(label)){
+          out.push({label, weight: pointsNum});
+        }
+        i += 3;
+        continue;
+      }
+    }
+    i += 1;
+  }
+  return out;
+}
+
+// Point-based grading breakdowns don't state a percentage directly — the
+// percentage is implied by each item's share of the course's total points.
+// Convert once we know the full point-based set, rounding to whole percent to
+// match how the rest of the UI treats weights.
+function convertPointsToPercent(cats){
+  const totalPoints = cats.reduce((s,c)=> s + c.weight, 0);
+  if(totalPoints <= 0) return cats;
+  return cats.map(c => ({
+    label: c.label,
+    weight: Math.round((c.weight / totalPoints) * 100)
+  }));
+}
+
+// Handles a grading table flattened by PDF extraction where columns are separated
+// by a run of 2+ spaces ("Label   Points   Percent%") rather than real table
+// structure — common enough that it's worth its own positional pass. This also
+// correctly bridges a parenthetical INSIDE the label itself ("Professional
+// Readiness Project (Group)"), which the generic percent regex below can't do
+// since "(" and ")" aren't part of its label character class.
+function extractSpacedTableCategories(text){
+  const cells = text.split(/ {2,}/).map(c=>c.trim()).filter(Boolean);
+  const out = [];
+  for(let i=0;i<cells.length;i++){
+    const pctMatch = cells[i].match(/^(\d{1,3})\s*%$/);
+    if(!pctMatch) continue;
+    const weight = parseInt(pctMatch[1],10);
+    if(weight<1||weight>100) continue;
+    // walk back past an optional points-possible cell (digits/spaces only,
+    // covers the "5 00" -> "500" digit-splitting artifact) to find the label
+    let labelIdx = i-1;
+    if(labelIdx>=0 && /^[\d\s,]{1,8}$/.test(cells[labelIdx])){
+      labelIdx -= 1;
+    }
+    if(labelIdx<0) continue;
+    const rawLabel = cells[labelIdx];
+    if(!/[A-Za-z]{2,}/.test(rawLabel)) continue; // must contain real words, not just numbers
+    const label = cleanLabel(rawLabel);
+    if(label.length<3) continue;
+    if(isNoiseLabel(label)) continue;
+    out.push({label, weight});
+  }
+  return out;
+}
+
+function guessCategories(text){
+  // Only trust the spaced-table read when it lands on an exact 100% — that's a
+  // strong signal the whole table was captured cleanly. A partial/incomplete read
+  // (seen on a differently-spaced table) falls through to the general-purpose
+  // regex below instead of silently presenting an incomplete category list.
+  const spacedTableCats = dedupeCategories(extractSpacedTableCategories(text));
+  if(spacedTableCats.length > 0 && spacedTableCats.reduce((s,c)=>s+c.weight,0) === 100){
+    return spacedTableCats;
+  }
+
+  const percentCats = dedupeCategories(extractPercentCategories(text));
+  // Percent-stated weights are authoritative when present — even a syllabus that
+  // also mentions point totals per item almost always treats the percentage
+  // breakdown as the real grading policy. Only fall back to points when no
+  // percent-style breakdown exists anywhere in the document at all.
+  if(percentCats.length > 0){
+    return percentCats;
+  }
+  if(spacedTableCats.length > 0){
+    return spacedTableCats; // incomplete but still better than nothing
+  }
+  const inlinePointCats = dedupeCategories(extractPointCategories(text));
+  if(inlinePointCats.length > 0){
+    return convertPointsToPercent(inlinePointCats);
+  }
+  const tablePointCats = dedupeCategories(extractPointsTableCategories(text));
+  if(tablePointCats.length > 0){
+    return convertPointsToPercent(tablePointCats);
+  }
+  return [];
+}
+
+// Handles a specific, common calendar-table shape: a flattened table where each row
+// is "<DATE> ... • item • item • item" with multiple graded items sharing ONE due
+// date per row, and exam rows shaped as "... MIDTERM/FINAL EXAM ... Due <date>"
+// (the date trails the label instead of leading it). This is a genuine table-layout
+// case, not just noisy prose — bullet markers ("•") are a strong, low-risk signal
+// that this structure applies, so it only activates when there are several of them.
+// When it applies, it's precise enough to be trusted over the generic before/after
+// windowing below, which cross-contaminates adjacent rows on tables this dense.
+function extractBulletedCalendarAssignments(text){
+  if((text.match(/•/g)||[]).length < 4) return null;
+
+  const monthNames = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December";
+  const dateRe = new RegExp(`\\b(${monthNames})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(20\\d{2}))?\\b`, "gi");
+
+  function monthToNum(m){
+    const map = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11};
+    const key = m.toLowerCase().slice(0,3).replace("sept","sep");
+    return key in map ? map[key] : null;
+  }
+  function toISO(month, day, year){
+    const y = year || today.getFullYear();
+    const mo = monthToNum(month);
+    if(mo===null) return null;
+    const dt = new Date(y, mo, parseInt(day,10));
+    return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0,10);
+  }
+
+  const matches = [];
+  let dm;
+  while((dm = dateRe.exec(text)) !== null){
+    const date = toISO(dm[1], dm[2], dm[3]);
+    if(date) matches.push({start: dm.index, end: dm.index + dm[0].length, date});
+  }
+  if(matches.length===0) return null;
+
+  const items = [];
+  for(let i=0; i<matches.length; i++){
+    const cur = matches[i];
+    const next = matches[i+1];
+    const prevEnd = i>0 ? matches[i-1].end : 0;
+
+    // Scope the exam-label check to the gap since the previous date only (capped at
+    // 200 chars) — a wider or unbounded window bleeds into unrelated earlier rows
+    // and wrongly attaches "Midterm Exam"/"Final Exam" to the following date too.
+    // The negative lookbehind (?<!for\s) is what tells an actual "MIDTERM EXAM"
+    // section header apart from an incidental "...study for midterm exam" mention.
+    const gapStart = Math.max(prevEnd, cur.start - 200);
+    const gapText = text.slice(gapStart, cur.start);
+    const isMidterm = /(?<!for\s)\bmidterm\s*exam\b/i.test(gapText);
+    const isFinal = /(?<!for\s)\bfinal\s*exam\b/i.test(gapText);
+
+    if(isMidterm){ items.push({id:uid(), name:"Midterm Exam", date: cur.date, weight:0}); continue; }
+    if(isFinal){ items.push({id:uid(), name:"Final Exam", date: cur.date, weight:0}); continue; }
+
+    const regionEnd = next ? next.start : Math.min(text.length, cur.end + 600);
+    const region = text.slice(cur.end, regionEnd);
+    const bullets = region.split("•").slice(1);
+    bullets.forEach(b=>{
+      let name = b.replace(/\s{2,}/g," ").trim();
+      // stop at boilerplate/boundary leakage from the next row or an exam callout
+      name = name.split(/\bUNIT\s*\d+\b/i)[0];
+      name = name.split(/\bMIDTERM\s*EXAM\b/i)[0];
+      name = name.split(/\bFINAL\s*EXAM\b/i)[0];
+      name = name.replace(/[\s.\-–—:]+$/,"").trim();
+      // cosmetic cleanup of PDF-extraction spacing artifacts ("Discussion # 6 :" -> "Discussion #6:")
+      name = name.replace(/#\s+/g,"#").replace(/\s+-\s+/g,"-").replace(/\s+:/g,":");
+      name = name.slice(0,80);
+      if(name.length<4) return;
+      if(/^study\s+for\b/i.test(name)) return; // prep reminder, not a graded item
+      if(!/discussion\s*#?\s*\d+|assignment\s*#?\s*\d+|quiz\b/i.test(name)) return;
+      items.push({id:uid(), name, date: cur.date, weight:0});
+    });
+  }
+  return items;
+}
+
+// Handles a DIFFERENT bulleted shape than the calendar-table extractor above: a
+// syllabus that lists graded items as a flat bullet list where EACH bullet states
+// its OWN due date inline ("• Chapter 1: ... (InQuizitive & Smartwork due 8/27)"),
+// rather than one shared date heading a group of bullets. Only fires when there
+// are several bullets, so it won't misfire on a document that just happens to use
+// a bullet or two for unrelated formatting.
+function extractPerBulletInlineDateAssignments(text){
+  const bulletCount = (text.match(/•/g)||[]).length;
+  if(bulletCount < 3) return null;
+
+  const numRe = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/;
+  const monthNames = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December";
+  const monthRe = new RegExp(`\\b(${monthNames})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(20\\d{2}))?\\b`, "i");
+
+  function monthToNum(m){
+    const map = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11};
+    const key = m.toLowerCase().slice(0,3).replace("sept","sep");
+    return key in map ? map[key] : null;
+  }
+  function toISO(month, day, year){
+    const y = year || today.getFullYear();
+    const mo = monthToNum(month);
+    if(mo===null) return null;
+    const dt = new Date(y, mo, parseInt(day,10));
+    return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0,10);
+  }
+
+  const bullets = text.split("•").slice(1);
+  const items = [];
+  bullets.forEach(raw=>{
+    const chunk = raw.slice(0, 300);
+    let iso = null;
+    const numMatch = chunk.match(numRe);
+    if(numMatch){
+      const mm = parseInt(numMatch[1],10)-1;
+      const monthAbbr = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"][mm];
+      if(monthAbbr) iso = toISO(monthAbbr, numMatch[2], numMatch[3] ? (numMatch[3].length===2?"20"+numMatch[3]:numMatch[3]) : null);
+    }
+    if(!iso){
+      const monthMatch = chunk.match(monthRe);
+      if(monthMatch) iso = toISO(monthMatch[1], monthMatch[2], monthMatch[3]);
+    }
+    if(!iso) return; // this bullet has no date of its own — not every bullet needs one
+
+    let name = chunk;
+    const parenIdx = name.indexOf("(");
+    if(parenIdx > 3) name = name.slice(0, parenIdx); // drop the "(...due date...)" parenthetical
+    name = name.split(/\n/)[0];
+    name = name.replace(/\s{2,}/g," ").trim().replace(/[\s.\-–—:]+$/,"");
+    if(name.length < 4) return;
+    if(/^study\s+for\b/i.test(name)) return;
+    items.push({id:uid(), name: name.slice(0,80), date: iso, weight:0});
+  });
+
+  return items.length > 0 ? items : null;
+}
+
+// Catches quiz/exam due dates stated as plain prose in the grading-policy section,
+// in the same "Label (...) N pts" shape extractPointCategories already recognizes
+// for weights — e.g. "Section 1 Exam (Thurs. 9/24) 200 pts" or a semicolon list of
+// several quiz dates sharing one label: "Quizzes (Thurs. 9/3; Thurs. 9/17; ...) 100 pts".
+// Every date found inside the parenthetical becomes its own dated item under that label.
+function extractLabeledPointDates(text){
+  const re = /([A-Za-z][A-Za-z0-9 &\/\-']{1,44}?)[\s.\-]*[:\-]?[\s.\-]*\(([^)]{0,160})\)\s*\d{1,4}\s?(?:pts?\.?|points?)\b/gi;
+  const items = [];
+  let m;
+  const map = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  while((m = re.exec(text)) !== null){
+    const label = cleanLabel(m[1]);
+    if(label.length<3 || isNoiseLabel(label)) continue;
+    const parenContent = m[2];
+    const numRe = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+    let dm;
+    while((dm = numRe.exec(parenContent)) !== null){
+      const mm = parseInt(dm[1],10)-1;
+      const monthAbbr = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"][mm];
+      if(!monthAbbr) continue;
+      const y = dm[3] ? (dm[3].length===2?"20"+dm[3]:dm[3]) : today.getFullYear();
+      const dt = new Date(y, map[monthAbbr], parseInt(dm[2],10));
+      if(isNaN(dt.getTime())) continue;
+      items.push({id:uid(), name: label, date: dt.toISOString().slice(0,10), weight:0});
+    }
+  }
+  return items;
+}
+
+// Handles a week-by-week schedule table (no bullets at all) flattened by PDF/docx
+// extraction into 2+-space-separated cells — a "Week N: date-range / Topic / Read /
+// Assignment" layout where the real graded item is anchored by the literal word
+// "Due" next to its date, either within the same cell ("Career Center Resume Review
+// Due Sept. 13") or as a standalone label cell followed by a separate date cell
+// ("Final Exam Period" / "Thursday, December 10"). This avoids the cross-
+// contamination a generic before/after text window produces on a dense table like
+// this, where topic/reading/assignment columns all run together with no delimiter.
+function extractDueAnchoredAssignments(text){
+  const cells = text.split(/ {2,}/).map(c=>c.trim()).filter(Boolean);
+  if(cells.length < 4) return null;
+
+  const monthNames = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December";
+  const map = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11};
+
+  function toISO(month, day, year){
+    const y = year || today.getFullYear();
+    const key = month.toLowerCase().slice(0,3).replace("sept","sep");
+    const mo = map[key];
+    if(mo===undefined) return null;
+    const dt = new Date(y, mo, parseInt(day,10));
+    return isNaN(dt.getTime()) ? null : dt.toISOString().slice(0,10);
+  }
+
+  const dueInlineRe = new RegExp(`^(.*?)\\bDue\\b\\s*:?\\s*(?:(${monthNames})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(20\\d{2}))?|(\\d{1,2})\\/(\\d{1,2})(?:\\/(\\d{2,4}))?)\\s*$`, "i");
+  const standaloneDateRe = new RegExp(`^(?:\\w+,\\s*)?(${monthNames})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(20\\d{2}))?$`, "i");
+
+  const items = [];
+  for(let i=0;i<cells.length;i++){
+    const inlineMatch = cells[i].match(dueInlineRe);
+    if(inlineMatch){
+      const name = inlineMatch[1].replace(/[\s.\-–—:]+$/,"").trim();
+      let iso;
+      if(inlineMatch[2]) iso = toISO(inlineMatch[2], inlineMatch[3], inlineMatch[4]);
+      else {
+        const mm = parseInt(inlineMatch[5],10)-1;
+        const monthAbbr = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"][mm];
+        iso = monthAbbr ? toISO(monthAbbr, inlineMatch[6], inlineMatch[7] ? (inlineMatch[7].length===2?"20"+inlineMatch[7]:inlineMatch[7]) : null) : null;
+      }
+      if(iso && name.length>=4){
+        items.push({id:uid(), name: name.slice(0,80), date: iso, weight:0});
+      }
+      continue;
+    }
+    if(i+1 < cells.length){
+      const dateMatch = cells[i+1].match(standaloneDateRe);
+      if(dateMatch && /[A-Za-z]{3,}/.test(cells[i]) && cells[i].length>=4 && cells[i].length < 40 && !/^due$/i.test(cells[i].trim())){
+        const iso = toISO(dateMatch[1], dateMatch[2], dateMatch[3]);
+        if(iso){
+          items.push({id:uid(), name: cells[i].slice(0,80), date: iso, weight:0});
+        }
+      }
+    }
+  }
+  return items.length > 0 ? items : null;
+}
+
+function guessAssignments(text){
+  const bulletedResult = extractBulletedCalendarAssignments(text);
+  if(bulletedResult && bulletedResult.length > 0){
+    return bulletedResult.sort((a,b)=> new Date(a.date)-new Date(b.date)).slice(0,150);
+  }
+
+  // Different bullet shape (each bullet carries its own inline date) — combine with
+  // any prose-stated exam/quiz dates found the same way, since a syllabus using this
+  // format for its reading list often states exam dates in ungrouped prose nearby.
+  const perBulletResult = extractPerBulletInlineDateAssignments(text);
+  if(perBulletResult && perBulletResult.length > 0){
+    const labeledDates = extractLabeledPointDates(text);
+    const combined = [...perBulletResult, ...labeledDates];
+    const seen = new Set();
+    const deduped = combined.filter(it=>{
+      const k = it.date+"|"+it.name.toLowerCase();
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    return deduped.sort((a,b)=> new Date(a.date)-new Date(b.date)).slice(0,150);
+  }
+
+  // No bullets at all — try a "Due <date>" anchored week-by-week schedule table
+  // before falling back to the generic (noisier) before/after windowing below.
+  const dueAnchoredResult = extractDueAnchoredAssignments(text);
+  if(dueAnchoredResult && dueAnchoredResult.length > 0){
+    return dueAnchoredResult.sort((a,b)=> new Date(a.date)-new Date(b.date)).slice(0,150);
+  }
+
+  const items = [];
+  const monthNames = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December";
+  // Month-first: "Sept. 13", "December 12, 2026"
+  const dateReMonthFirst = new RegExp(`\\b(${monthNames})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(20\\d{2}))?\\b`,"gi");
+  // Day-first: "21 Sep", "21-Sep", "21st of September"
+  const dateReDayFirst = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?[\\s\\-]+(?:of\\s+)?(${monthNames})\\.?(?:[\\s,\\-]*(20\\d{2}))?\\b`,"gi");
+  // Numeric: 9/2, 9/2/26, 12/1/2026
+  const numRe = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+  const fullText = text;
+
+  function cleanFragment(s){
+    if(!s) return "";
+    return s
+      .replace(/[|]/g," ")                 // table pipe separators
+      .replace(/^[\s.\-–—:]+/,"")          // leading punctuation/dot-leaders
+      .replace(/[\s.\-–—:]+$/,"")          // trailing punctuation
+      .replace(/^\s*(week\s*)?\d{1,2}\s+/i,"") // leading row/week numbers e.g. "3   " or "Week 3 "
+      .replace(/\s{2,}/g," ")
+      .trim();
+  }
+
+  function bestName(before, after){
+    const b = cleanFragment(before);
+    const a = cleanFragment(after.split(/\n/)[0]); // stop at next line
+    // prefer whichever fragment has more letters (not just numbers/table noise)
+    const letterCount = s => (s.match(/[A-Za-z]/g)||[]).length;
+    if(letterCount(b) >= 4 && letterCount(b) >= letterCount(a)) return b;
+    if(letterCount(a) >= 4) return a;
+    return letterCount(b) > letterCount(a) ? b : a;
+  }
+
+  function pushItem(name, month, day, year){
+    if(!name) return;
+    name = name.replace(/\s{2,}/g," ").trim().slice(0,80);
+    if(name.length<4) return;
+    // A pure room/building reference ("Lab Room 434 or 229", "Room 229") is a meeting
+    // location note attached to a class-day date, not a graded item — reject only when
+    // the ENTIRE name is just that pattern, so a real item that happens to mention a
+    // room as part of a longer description ("Lab 3 due — Room 229") still comes through.
+    if(/^(the\s+)?(lab\s*)?room\s*#?\s*\d+(\s*(or|and|\/)\s*\d+)?\.?$/i.test(name)) return;
+    const y = year || today.getFullYear();
+    const mo = monthToNum(month);
+    if(mo===null) return;
+    const dt = new Date(y, mo, parseInt(day,10));
+    if(isNaN(dt.getTime())) return;
+    items.push({id:uid(), name, date: dt.toISOString().slice(0,10), weight:0});
+  }
+  function monthToNum(m){
+    const map = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11};
+    const key = m.toLowerCase().slice(0,3).replace("sept","sep");
+    return key in map ? map[key] : (map[m.toLowerCase().slice(0,4)] ?? null);
+  }
+  function contextAround(m){
+    const start = Math.max(0, m.index-70);
+    const before = fullText.slice(start, m.index).split(/\n/).pop();
+    const after = fullText.slice(m.index + m[0].length, m.index + m[0].length + 70);
+    return {before, after};
+  }
+
+  let m;
+  const re1 = new RegExp(dateReMonthFirst);
+  while((m = re1.exec(fullText)) !== null){
+    const {before, after} = contextAround(m);
+    pushItem(bestName(before, after), m[1], m[2], m[3]);
+  }
+  const re1b = new RegExp(dateReDayFirst);
+  while((m = re1b.exec(fullText)) !== null){
+    const {before, after} = contextAround(m);
+    pushItem(bestName(before, after), m[2], m[1], m[3]);
+  }
+  const re2 = new RegExp(numRe);
+  while((m = re2.exec(fullText)) !== null){
+    const {before, after} = contextAround(m);
+    const monthIdx = parseInt(m[1],10)-1;
+    const monthAbbr = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"][monthIdx];
+    if(monthAbbr) pushItem(bestName(before, after), monthAbbr, m[2], m[3] ? (m[3].length===2?"20"+m[3]:m[3]) : null);
+  }
+  // de-dupe by date+name, and drop near-empty/noise-only names
+  const seen = new Set();
+  return items.filter(it=>{
+    if(/^[\d\s\-|.,]*$/.test(it.name)) return false; // pure noise, no letters
+    const k = it.date+"|"+it.name.toLowerCase();
+    if(seen.has(k)) return false;
+    seen.add(k); return true;
+  }).sort((a,b)=> new Date(a.date)-new Date(b.date)).slice(0,150);
+}
+
+function parseSyllabusText(text, fallbackName){
+  const normalized = normalizeSmallCapsSpacing(text);
+  return {
+    name: guessClassName(normalized, fallbackName),
+    categories: guessCategories(normalized),
+    assignments: guessAssignments(normalized)
+  };
+}
+
+/* ---------- GRADE MATH ---------- */
+function letterFor(pct){
+  if(pct>=93) return "A"; if(pct>=90) return "A-";
+  if(pct>=87) return "B+"; if(pct>=83) return "B"; if(pct>=80) return "B-";
+  if(pct>=77) return "C+"; if(pct>=73) return "C"; if(pct>=70) return "C-";
+  if(pct>=67) return "D+"; if(pct>=63) return "D"; if(pct>=60) return "D-";
+  return "F";
+}
+function letterToPct(letter){
+  const map = {A:93,"A-":90,"B+":87,B:83,"B-":80,"C+":77,C:73,"C-":70,"D+":67,D:63,"D-":60,F:50};
+  return map[letter.toUpperCase().trim()] ?? (isNaN(parseFloat(letter)) ? 90 : parseFloat(letter));
+}
+function computeStanding(cls){
+  let weightedSum=0, weightEntered=0;
+  (cls.categories||[]).forEach(cat=>{
+    const v = cls.scores?.[cat.label];
+    if(v!==undefined && v!==null && v!=="" && !isNaN(v)){
+      weightedSum += (Number(v)/100)*cat.weight;
+      weightEntered += cat.weight;
+    }
+  });
+  const currentPct = weightEntered>0 ? (weightedSum/weightEntered)*100 : null;
+  return {currentPct, remainingWeight: Math.max(0,100-weightEntered), weightedSum, weightEntered};
+}
+function requiredRemaining(cls, targetPct){
+  const {weightedSum, remainingWeight} = computeStanding(cls);
+  if(remainingWeight<=0) return null;
+  return ((targetPct-weightedSum)/remainingWeight)*100;
+}
+function bufferMessage(need, remainingWeight, targetLabel, lowercaseLead){
+  if(need===null) return `Enter a grade to calculate your buffer for ${targetLabel}.`;
+  if(need<=0) return `${lowercaseLead?"a":"A"}lready secured — even a 0% on what's left keeps you at or above ${targetLabel}.`;
+  if(need>100) return `${targetLabel} is <b>no longer mathematically reachable</b> — even 100% on the remaining ${remainingWeight}% won't get you there.`;
+  return `Need <b>${need.toFixed(1)}%</b> avg on remaining <b>${remainingWeight}%</b> for ${targetLabel}.`;
+}
+function daysUntil(dateStr){
+  const d = new Date(dateStr+"T23:59:00");
+  return Math.ceil((d-today)/(1000*60*60*24));
+}
+function urgencyClass(days){
+  if(days<3) return "red";
+  if(days<7) return "amber";
+  return "green";
+}
+
+/* ================= ONBOARDING ================= */
+function renderOnboarding(){
+  const wrap = document.getElementById('onboarding');
+  const isMergeFlow = draftClasses.some(d=>d._mergeInto) && classes.length>0;
+  wrap.innerHTML = `
+    <div class="onboard-hero">
+      <h2>${isMergeFlow ? "Update a class with a revised syllabus." : "Let's set up your semester."}</h2>
+      <p>${isMergeFlow
+        ? "Drop in the updated file — new or changed weights and dates will be merged in, and none of your entered grades or checked-off assignments will be lost."
+        : "Drop in a syllabus or class calendar for each course — Syllabus Sync will pull out the class name, grading weights, and due dates automatically. You'll get to review and fix anything before it's saved."}</p>
+    </div>
+    <div id="draftClassList"></div>
+    <div class="add-another" id="addAnotherBtn">+ Add a class</div>
+    <div class="target-setup">
+      <h3>🎯 Your target grades</h3>
+      <div class="target-grid">
+        <div class="target-field">
+          <label>Overall GPA floor</label>
+          <input type="text" id="gpaFloorInput" placeholder='e.g. "3.35"' value="${targets.gpaFloor||""}">
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;">You'll set a per-class stretch goal (like an A) once your classes are added below — it defaults to A and you can change it any time.</p>
+    </div>
+    <div class="finish-setup-row">
+      <button class="btn btn-primary" id="finishSetupBtn" style="padding:12px 26px;font-size:14px;">Go to my dashboard →</button>
+    </div>
+  `;
+  document.getElementById('addAnotherBtn').addEventListener('click', addDraftClassBox);
+  document.getElementById('finishSetupBtn').addEventListener('click', finishSetup);
+  document.getElementById('gpaFloorInput').addEventListener('input', e=>{ targets.gpaFloor = e.target.value; });
+
+  renderDraftClassList();
+  if(draftClasses.length===0) addDraftClassBox();
+}
+
+function addDraftClassBox(){
+  draftClasses.push({ _id: uid(), stage:"upload", parsed:null, fileName:null, showPaste:false });
+  renderDraftClassList();
+}
+
+function renderDraftClassList(){
+  const list = document.getElementById('draftClassList');
+  list.innerHTML = draftClasses.map(dc => renderDraftCard(dc)).join("");
+  draftClasses.forEach(dc => wireDraftCard(dc));
+}
+
+function renderDraftCard(dc){
+  if(dc.stage === "upload"){
+    return `
+    <div class="class-setup-card" data-id="${dc._id}">
+      <div class="csc-head">
+        <h3>New class</h3>
+        <span class="status-chip pending">Not added yet</span>
+      </div>
+      <div class="upload-box" id="drop-${dc._id}">
+        <div class="icon">📎</div>
+        <h3>Drop your syllabus or calendar here</h3>
+        <p>PDF, Word (.docx), or .txt — parsed entirely in your browser</p>
+        <button class="btn btn-ghost btn-sm" type="button" id="browse-${dc._id}">Browse files</button>
+        <input type="file" accept=".pdf,.docx,.txt" id="file-${dc._id}">
+      </div>
+      <div class="upload-error hide" id="uploaderror-${dc._id}"></div>
+      <div class="paste-toggle" id="pastetoggle-${dc._id}">or paste the text instead</div>
+      <div class="paste-area hide" id="pastearea-${dc._id}">
+        <textarea placeholder="Paste your syllabus or schedule text here..." id="pastetext-${dc._id}"></textarea>
+        <div style="text-align:right;margin-top:8px;">
+          <button class="btn btn-primary btn-sm" id="pasteparse-${dc._id}">Parse this text</button>
+        </div>
+      </div>
+      <div class="hide" id="loading-${dc._id}" style="text-align:center;padding:14px;color:var(--muted);font-size:13px;">Reading and parsing your file…</div>
+    </div>`;
+  }
+  // review stage
+  const p = dc.parsed;
+  const wtSum = p.categories.reduce((s,c)=>s+Number(c.weight||0),0);
+  return `
+  <div class="class-setup-card" data-id="${dc._id}">
+    <div class="csc-head">
+      <h3>${p.name || "New class"}</h3>
+      <span class="status-chip parsed">Parsed — review below</span>
+    </div>
+    <div class="parsed-review">
+      ${dc.isVisualCalendarGrid ? `
+      <div class="calendar-grid-warning">
+        📅 <b>This looks like a visual calendar grid</b> (day-by-day boxes under Mon–Sun headers), not a table or list — those don't extract cleanly, since flattening it to text loses which day each item belongs to. If this course also has a syllabus PDF with a grading table or weekly list, try that instead — it usually has the same information in a format we can read correctly. You can still review and fix what was found below, or start over with a different file.
+      </div>
+      ` : ""}
+      <div class="field-row">
+        <label>Class name</label>
+        <input type="text" class="dc-name" value="${escapeAttr(p.name)}">
+      </div>
+
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:14px 0 4px;">Grading categories</div>
+      <table class="edit-table">
+        <tr><th>Category</th><th>Weight %</th><th></th></tr>
+        <tbody class="dc-cat-body">
+          ${p.categories.map((c,i)=>`
+            <tr data-i="${i}">
+              <td><input type="text" class="dc-cat-label" value="${escapeAttr(c.label)}"></td>
+              <td><input type="number" class="dc-cat-weight num" value="${c.weight}"></td>
+              <td><button class="row-remove dc-cat-remove" type="button">✕</button></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+      <button class="add-row-btn dc-add-cat" type="button">+ Add category</button>
+      <div class="${wtSum===100?'weight-ok':'weight-warning'} dc-weight-msg">${wtSum===100? "✓ Weights add up to 100%" : `⚠ Weights currently add up to ${wtSum}% — adjust so they total 100%`}</div>
+
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:16px 0 4px;">Assignments &amp; exams</div>
+      <table class="edit-table">
+        <tr><th>Name</th><th>Date</th><th>Weight %</th><th></th></tr>
+        <tbody class="dc-assign-body">
+          ${p.assignments.map((a,i)=>`
+            <tr data-i="${i}">
+              <td><input type="text" class="dc-a-name" value="${escapeAttr(a.name)}"></td>
+              <td><input type="date" class="dc-a-date date" value="${a.date}"></td>
+              <td><input type="number" class="dc-a-weight num" value="${a.weight||0}"></td>
+              <td><button class="row-remove dc-a-remove" type="button">✕</button></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+      <button class="add-row-btn dc-add-assign" type="button">+ Add assignment</button>
+
+      <div class="save-class-row">
+        <button class="btn btn-ghost btn-sm dc-rescan" type="button">Re-upload / start over</button>
+        <button class="btn btn-primary btn-sm dc-save" type="button">${dc._mergeInto ? "Save changes to existing class" : "Save this class"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function escapeAttr(s){ return (s||"").replace(/"/g,"&quot;"); }
+
+function wireDraftCard(dc){
+  const card = document.querySelector(`.class-setup-card[data-id="${dc._id}"]`);
+  if(!card) return;
+
+  if(dc.stage === "upload"){
+    const dropBox = document.getElementById(`drop-${dc._id}`);
+    const fileInput = document.getElementById(`file-${dc._id}`);
+    const browseBtn = document.getElementById(`browse-${dc._id}`);
+    const pasteToggle = document.getElementById(`pastetoggle-${dc._id}`);
+    const pasteArea = document.getElementById(`pastearea-${dc._id}`);
+    const pasteParseBtn = document.getElementById(`pasteparse-${dc._id}`);
+
+    browseBtn.addEventListener('click', (e)=>{ e.stopPropagation(); fileInput.click(); });
+    dropBox.addEventListener('click', ()=> fileInput.click());
+    dropBox.addEventListener('dragover', e=>{ e.preventDefault(); dropBox.classList.add('drag'); });
+    dropBox.addEventListener('dragleave', ()=> dropBox.classList.remove('drag'));
+    dropBox.addEventListener('drop', async e=>{
+      e.preventDefault(); dropBox.classList.remove('drag');
+      if(e.dataTransfer.files.length) await handleFile(dc, e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', async e=>{
+      if(e.target.files.length) await handleFile(dc, e.target.files[0]);
+    });
+    pasteToggle.addEventListener('click', ()=>{
+      pasteArea.classList.toggle('hide');
+    });
+    pasteParseBtn.addEventListener('click', async ()=>{
+      const errorBox = document.getElementById(`uploaderror-${dc._id}`);
+      if(errorBox){ errorBox.classList.add('hide'); errorBox.textContent = ""; }
+      const text = document.getElementById(`pastetext-${dc._id}`).value;
+      if(text.trim().length<20){ showToast("Paste a bit more text to parse."); return; }
+      // Same garbage-text ratio check the file-upload path already runs — pasted text
+      // can be just as garbled as an uploaded file (e.g. someone pastes copied binary
+      // data or heavily mis-encoded text) and deserves the same protection, not a
+      // silent pass-through just because it arrived via textarea instead of a file.
+      if(looksLikeGarbageText(text)){
+        const message = "This doesn't look like readable text — it may have pasted in a broken or garbled form. Try copying it again, or upload the file directly instead.";
+        if(errorBox){ errorBox.textContent = "⚠ " + message; errorBox.classList.remove('hide'); }
+        else { showToast(message); }
+        return;
+      }
+      await handleParsedText(dc, text, "Pasted class");
+    });
+  } else {
+    // review stage wiring
+    card.querySelector('.dc-name').addEventListener('input', e=> dc.parsed.name = e.target.value);
+
+    card.querySelectorAll('.dc-cat-label').forEach((inp,i)=> inp.addEventListener('input', e=> dc.parsed.categories[i].label = e.target.value));
+    card.querySelectorAll('.dc-cat-weight').forEach((inp,i)=> inp.addEventListener('input', e=>{
+      dc.parsed.categories[i].weight = Number(e.target.value)||0;
+      updateWeightMsg(dc);
+    }));
+    card.querySelectorAll('.dc-cat-remove').forEach((btn,i)=> btn.addEventListener('click', ()=>{
+      dc.parsed.categories.splice(i,1); renderDraftClassList();
+    }));
+    card.querySelector('.dc-add-cat').addEventListener('click', ()=>{
+      dc.parsed.categories.push({label:"New Category", weight:0}); renderDraftClassList();
+    });
+
+    card.querySelectorAll('.dc-a-name').forEach((inp,i)=> inp.addEventListener('input', e=> dc.parsed.assignments[i].name = e.target.value));
+    card.querySelectorAll('.dc-a-date').forEach((inp,i)=> inp.addEventListener('input', e=> dc.parsed.assignments[i].date = e.target.value));
+    card.querySelectorAll('.dc-a-weight').forEach((inp,i)=> inp.addEventListener('input', e=> dc.parsed.assignments[i].weight = Number(e.target.value)||0));
+    card.querySelectorAll('.dc-a-remove').forEach((btn,i)=> btn.addEventListener('click', ()=>{
+      dc.parsed.assignments.splice(i,1); renderDraftClassList();
+    }));
+    card.querySelector('.dc-add-assign').addEventListener('click', ()=>{
+      dc.parsed.assignments.push({id:uid(), name:"New assignment", date: new Date().toISOString().slice(0,10), weight:0});
+      renderDraftClassList();
+    });
+
+    card.querySelector('.dc-rescan').addEventListener('click', ()=>{
+      dc.stage = "upload"; dc.parsed = null; renderDraftClassList();
+    });
+    card.querySelector('.dc-save').addEventListener('click', ()=> saveDraftClass(dc));
+  }
+}
+
+function updateWeightMsg(dc){
+  const card = document.querySelector(`.class-setup-card[data-id="${dc._id}"]`);
+  const wtSum = dc.parsed.categories.reduce((s,c)=>s+Number(c.weight||0),0);
+  const msg = card.querySelector('.dc-weight-msg');
+  msg.className = (wtSum===100 ? 'weight-ok' : 'weight-warning') + ' dc-weight-msg';
+  msg.textContent = wtSum===100 ? "✓ Weights add up to 100%" : `⚠ Weights currently add up to ${wtSum}% — adjust so they total 100%`;
+}
+
+async function handleFile(dc, file){
+  const loading = document.getElementById(`loading-${dc._id}`);
+  const errorBox = document.getElementById(`uploaderror-${dc._id}`);
+  if(errorBox){ errorBox.classList.add('hide'); errorBox.textContent = ""; }
+  if(loading) loading.classList.remove('hide');
+  dc.fileName = file.name;
+  try{
+    const text = await extractTextFromFile(file);
+    await handleParsedText(dc, text, file.name.replace(/\.(pdf|docx|txt)$/i,""));
+  }catch(err){
+    if(loading) loading.classList.add('hide');
+    const message = (err instanceof UnsupportedFileError) ? err.userMessage
+      : "Couldn't read that file — try \"paste text instead\" below.";
+    if(errorBox){
+      errorBox.textContent = "⚠ " + message;
+      errorBox.classList.remove('hide');
+    } else {
+      showToast(message);
+    }
+    // Surface the fallback immediately rather than making the student hunt for it —
+    // this is exactly the moment "obvious fallback" matters most.
+    const pasteArea = document.getElementById(`pastearea-${dc._id}`);
+    if(pasteArea) pasteArea.classList.remove('hide');
+  }
+}
+
+async function handleParsedText(dc, text, fallbackName){
+  const parsed = parseSyllabusText(text, fallbackName);
+  if(parsed.categories.length===0){
+    parsed.categories.push({label:"Category 1", weight:0});
+  }
+  // If this upload is meant to update an existing class, default the name to the
+  // existing class's name so a slightly different title on the new file doesn't
+  // silently rename it (still editable).
+  if(dc._mergeInto){
+    const target = classes.find(c=>c.id===dc._mergeInto);
+    if(target) parsed.name = target.name;
+  }
+  dc.parsed = parsed;
+  dc.isVisualCalendarGrid = looksLikeVisualCalendarGrid(text);
+  dc.stage = "review";
+  renderDraftClassList();
+}
+
+// Merges freshly-parsed categories/assignments into an existing class WITHOUT
+// wiping its stored scores or the completed-checkbox state of assignments that
+// still exist. Matching is by label/name (case-insensitive), so:
+//  - an existing category/assignment that reappears gets its weight/date updated
+//    (this is how a "date change" reflected in a revised syllabus gets picked up)
+//  - a new category/assignment gets added
+//  - anything NOT present in the new parse is left alone (never silently deleted),
+//    since the parser can miss things the first person already fixed by hand.
+function mergeParsedIntoClass(existing, parsed){
+  const catByKey = {};
+  existing.categories.forEach(c => catByKey[c.label.toLowerCase().trim()] = c);
+  parsed.categories.forEach(nc=>{
+    const key = nc.label.toLowerCase().trim();
+    if(catByKey[key]){
+      catByKey[key].weight = nc.weight;
+    } else {
+      existing.categories.push({label:nc.label, weight:nc.weight});
+    }
+  });
+
+  const assignByKey = {};
+  existing.assignments.forEach(a => assignByKey[a.name.toLowerCase().trim()] = a);
+  parsed.assignments.forEach(na=>{
+    const key = na.name.toLowerCase().trim();
+    if(assignByKey[key]){
+      assignByKey[key].date = na.date;         // picks up date changes
+      if(na.weight) assignByKey[key].weight = na.weight;
+    } else {
+      existing.assignments.push({id:uid(), name:na.name, date:na.date, weight:na.weight||0});
+    }
+  });
+}
+
+function saveDraftClass(dc){
+  const p = dc.parsed;
+  if(!p.name || !p.name.trim()){ showToast("Give this class a name first."); return; }
+  p.categories = p.categories.filter(c=>c.label && c.label.trim());
+  p.assignments = p.assignments.filter(a=>a.name && a.date);
+
+  if(dc._mergeInto){
+    const target = classes.find(c=>c.id===dc._mergeInto);
+    if(target){
+      target.name = p.name.trim();
+      mergeParsedIntoClass(target, p);
+      saveClasses();
+      draftClasses = draftClasses.filter(d=>d._id!==dc._id);
+      showToast(`${target.name} updated — existing grades kept ✓`);
+      renderDraftClassList();
+      return;
+    }
+    // fall through to "add as new" if the target class no longer exists
+  }
+
+  const color = COLORS[classes.length % COLORS.length];
+  classes.push({
+    id: uid(),
+    name: p.name.trim(),
+    color,
+    categories: p.categories,
+    assignments: p.assignments,
+    scores: {}
+  });
+  targets.perClass[classes[classes.length-1].id] = "A";
+  saveClasses(); saveTargets();
+  draftClasses = draftClasses.filter(d=>d._id!==dc._id);
+  showToast(`${p.name} added ✓`);
+  renderDraftClassList();
+}
+
+async function finishSetup(){
+  if(classes.length===0){
+    showToast("Add at least one class before continuing.");
+    return;
+  }
+  await saveTargets();
+  activeTab = "overview";
+  renderApp();
+}
+
+/* ================= DASHBOARD ================= */
+function renderTopActions(){
+  const wrap = document.getElementById('topActions');
+  const exportImportHtml = `
+    <button class="btn btn-ghost btn-sm" id="exportTopBtn" title="Download all your data as a JSON file">⬇ Export</button>
+    <button class="btn btn-ghost btn-sm" id="importTopBtn" title="Restore data from an exported JSON file">⬆ Import</button>
+    <input type="file" accept="application/json,.json" id="importFileInput">
+  `;
+  if(classes.length===0){
+    wrap.innerHTML = exportImportHtml;
+  } else {
+    wrap.innerHTML = `
+      <button class="btn btn-ghost btn-sm" id="addClassTopBtn">+ Add class</button>
+      <button class="btn btn-ghost btn-sm" id="settingsTopBtn">🎯 Targets</button>
+      ${exportImportHtml}
+    `;
+    document.getElementById('addClassTopBtn').addEventListener('click', ()=>{
+      document.getElementById('dashboard').classList.add('hide');
+      document.getElementById('onboarding').classList.remove('hide');
+      // renderOnboarding() builds the #draftClassList container from scratch — it must
+      // run FIRST. Calling addDraftClassBox()/renderDraftClassList() before that container
+      // exists throws (there's nothing to write into) and silently aborts this whole
+      // handler, leaving onboarding empty. renderOnboarding() already seeds an empty
+      // draftClasses with one box itself, so nothing else needs to happen here.
+      renderOnboarding();
+    });
+    document.getElementById('settingsTopBtn').addEventListener('click', openTargetsPrompt);
+  }
+  document.getElementById('exportTopBtn').addEventListener('click', exportData);
+  document.getElementById('importTopBtn').addEventListener('click', ()=> document.getElementById('importFileInput').click());
+  document.getElementById('importFileInput').addEventListener('change', handleImportFile);
+}
+
+/* ---------- EXPORT / IMPORT ---------- */
+function exportData(){
+  const payload = {
+    _syllabusSyncExport: true,
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    classes,
+    targets,
+    completed: [...completed]
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `syllabus-sync-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("Backup downloaded ✓");
+}
+
+async function handleImportFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data || !Array.isArray(data.classes)){
+      showToast("That doesn't look like a Syllabus Sync export file.");
+      e.target.value = "";
+      return;
+    }
+    const proceed = classes.length===0 || confirm("Importing will replace your current classes, grades, and settings in this browser with the backup file. Continue?");
+    if(!proceed){ e.target.value=""; return; }
+    classes = Array.isArray(data.classes) ? data.classes : [];
+    targets = data.targets && typeof data.targets==="object" ? data.targets : {gpaFloor:"", perClass:{}};
+    if(!targets.perClass) targets.perClass = {};
+    completed = new Set(Array.isArray(data.completed) ? data.completed : []);
+    await saveClasses(); await saveTargets(); await saveCompleted();
+    e.target.value = "";
+    activeTab = "overview";
+    showToast("Backup restored ✓");
+    renderApp();
+  }catch(err){
+    showToast("Couldn't read that file — make sure it's a Syllabus Sync export.");
+    e.target.value = "";
+  }
+}
+
+function openTargetsPrompt(){
+  const floor = prompt("Overall GPA floor (e.g. 3.35):", targets.gpaFloor||"");
+  if(floor!==null){ targets.gpaFloor = floor; saveTargets(); renderApp(); }
+}
+
+function renderApp(){
+  const onboardEl = document.getElementById('onboarding');
+  const dashEl = document.getElementById('dashboard');
+  renderTopActions();
+
+  if(classes.length===0){
+    onboardEl.classList.remove('hide');
+    dashEl.classList.add('hide');
+    dashEl.innerHTML = ""; // clear stale tab buttons/content — nothing should linger
+                            // referencing a class that may no longer exist in state
+    renderOnboarding();
+    return;
+  }
+  onboardEl.classList.add('hide');
+  dashEl.classList.remove('hide');
+  renderDashboard();
+}
+
+function allAssignments(){
+  const items = [];
+  classes.forEach(cls=>{
+    (cls.assignments||[]).forEach(a=> items.push({...a, classId:cls.id, className:cls.name, color:cls.color}));
+  });
+  return items.sort((a,b)=> new Date(a.date)-new Date(b.date));
+}
+
+function renderDashboard(){
+  const dash = document.getElementById('dashboard');
+  dash.innerHTML = `
+    <div class="tabs" id="tabsRow"></div>
+    <div id="tabContent"></div>
+  `;
+  renderTabs();
+  renderTabContent();
+}
+
+function renderTabs(){
+  const row = document.getElementById('tabsRow');
+  const tabs = [{id:"overview", label:"Overview", color:"var(--indigo)"}].concat(
+    classes.map(c=>({id:c.id, label:c.name, color:c.color}))
+  );
+  row.innerHTML = tabs.map(t=>`
+    <button class="tab-btn ${activeTab===t.id?'active':''}" data-tab="${t.id}">
+      ${t.id!=="overview" ? `<span class="dot" style="background:${activeTab===t.id?'#fff':t.color}"></span>`:""}${t.label}
+    </button>
+  `).join("");
+  row.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ activeTab = btn.dataset.tab; renderTabs(); renderTabContent(); });
+  });
+}
+
+function renderTabContent(){
+  const wrap = document.getElementById('tabContent');
+  if(activeTab==="overview"){ wrap.innerHTML = ""; renderOverviewTab(wrap); }
+  else{
+    const cls = classes.find(c=>c.id===activeTab);
+    wrap.innerHTML = "";
+    if(cls) renderClassTab(wrap, cls);
+  }
+}
+
+/* ---------- THIS WEEK'S LOAD ---------- */
+function computeThisWeeksLoad(items){
+  const thisWeek = items.filter(i=>{ const d=daysUntil(i.date); return d>=0 && d<=7; });
+  const thisWeekWeight = thisWeek.reduce((s,i)=> s + (Number(i.weight)||0), 0);
+
+  // Semester average weekly load: total weight across all assignments / number of weeks the
+  // syllabus data actually spans (earliest to latest due date), minimum 1 week to avoid /0.
+  if(items.length===0){
+    return { thisWeekWeight:0, avgWeeklyWeight:0, ratio:0, label:"No Data", thisWeekItems:thisWeek };
+  }
+  const dates = items.map(i=> new Date(i.date+"T00:00:00").getTime());
+  const spanDays = Math.max(7, (Math.max(...dates) - Math.min(...dates)) / (1000*60*60*24));
+  const spanWeeks = Math.max(1, spanDays/7);
+  const totalWeight = items.reduce((s,i)=> s + (Number(i.weight)||0), 0);
+  const avgWeeklyWeight = totalWeight / spanWeeks;
+
+  const ratio = avgWeeklyWeight>0 ? thisWeekWeight/avgWeeklyWeight : (thisWeekWeight>0 ? 2 : 0);
+  let label;
+  if(thisWeekWeight===0) label = "Light";
+  else if(ratio < 0.75) label = "Light";
+  else if(ratio < 1.25) label = "Moderate";
+  else if(ratio < 2) label = "Heavy";
+  else label = "Crunch";
+
+  return { thisWeekWeight, avgWeeklyWeight, ratio, label, thisWeekItems:thisWeek };
+}
+
+function renderLoadWidget(items){
+  const load = computeThisWeeksLoad(items);
+  const badgeClass = load.label.toLowerCase();
+  const barPct = Math.min(100, load.avgWeeklyWeight>0 ? (load.thisWeekWeight/(load.avgWeeklyWeight*2))*100 : (load.thisWeekWeight>0?100:0));
+  const barColor = {light:"var(--mint)",moderate:"var(--amber)",heavy:"var(--crimson)",crunch:"var(--crimson)","no data":"var(--muted)"}[badgeClass] || "var(--indigo)";
+  const classNames = [...new Set(load.thisWeekItems.map(i=>i.className))];
+  return `
+    <div class="load-card">
+      <div class="load-top">
+        <h3>📅 This Week's Load</h3>
+        <span class="load-badge ${badgeClass}">${load.label}</span>
+      </div>
+      <div class="load-bar-track"><div class="load-bar-fill" style="width:${barPct}%;background:${barColor}"></div></div>
+      <div class="load-detail">
+        ${load.thisWeekWeight}% of your grade is due in the next 7 days
+        ${load.avgWeeklyWeight>0 ? ` — about <b>${(load.ratio).toFixed(1)}×</b> your semester-average week (${load.avgWeeklyWeight.toFixed(1)}%/wk)` : ""}
+        ${classNames.length ? ` across ${classNames.join(", ")}` : ". Nothing due this week — good time to get ahead."}
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- OVERVIEW TAB ---------- */
+let overviewFilter = "all";
+function renderOverviewTab(wrap){
+  const standings = classes.map(c=>({cls:c, s:computeStanding(c)}));
+  const withGrades = standings.filter(x=>x.s.currentPct!==null);
+  const avg = withGrades.length ? withGrades.reduce((s,x)=>s+x.s.currentPct,0)/withGrades.length : null;
+  const items = allAssignments();
+  const upcoming = items.filter(i=>daysUntil(i.date)>=0)[0];
+  const highStakesUpcoming = items.filter(i=> i.weight>=15 && daysUntil(i.date)>=0)[0];
+  const doneCount = items.filter(i=>completed.has(i.id)).length;
+
+  const section = document.createElement('div');
+  section.innerHTML = `
+    ${renderLoadWidget(items)}
+    <div class="metrics">
+      <div class="metric accent-indigo">
+        <div class="label">Average Standing</div>
+        <div class="value">${avg!==null? avg.toFixed(1)+"%" : "—"}</div>
+        <div class="detail">${avg!==null? letterFor(avg) : "Enter grades in a class tab"}${targets.gpaFloor? " · floor "+targets.gpaFloor : ""}</div>
+      </div>
+      <div class="metric accent-amber">
+        <div class="label">Next Due</div>
+        <div class="value" style="font-size:15px;">${upcoming? upcoming.name : "Nothing scheduled"}</div>
+        <div class="detail">${upcoming? upcoming.className+" · "+daysUntil(upcoming.date)+"d" : ""}</div>
+      </div>
+      <div class="metric accent-crimson">
+        <div class="label">Highest Priority Risk</div>
+        <div class="value" style="font-size:15px;">${highStakesUpcoming? highStakesUpcoming.name : "None upcoming"}</div>
+        <div class="detail">${highStakesUpcoming? "Worth "+highStakesUpcoming.weight+"% · "+daysUntil(highStakesUpcoming.date)+"d left" : ""}</div>
+      </div>
+      <div class="metric accent-mint">
+        <div class="label">Checked Off</div>
+        <div class="value">${doneCount} / ${items.length}</div>
+        <div class="detail">${items.length? Math.round((doneCount/items.length)*100)+"% of tracked items" : "No items yet"}</div>
+      </div>
+    </div>
+
+    <div class="section-title"><h2>All Deadlines</h2><div class="rule"></div></div>
+    <div class="filters" id="ovFilters">
+      <button data-f="all" class="${overviewFilter==='all'?'active':''}">All</button>
+      ${classes.map(c=>`<button data-f="${c.id}" class="${overviewFilter===c.id?'active':''}">${c.name}</button>`).join("")}
+      <button data-f="high" class="${overviewFilter==='high'?'active':''}">High-Stakes ≥15%</button>
+      <button data-f="week" class="${overviewFilter==='week'?'active':''}">Next 7 Days</button>
+    </div>
+    <div class="ledger" id="ovLedger"></div>
+
+    <div class="section-title"><h2>Pacing Risk — busiest weeks</h2><div class="rule"></div></div>
+    <div id="ovRisk"></div>
+  `;
+  wrap.appendChild(section);
+
+  section.querySelectorAll('#ovFilters button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ overviewFilter = btn.dataset.f; renderOverviewTab_refresh(); });
+  });
+
+  renderLedgerInto(document.getElementById('ovLedger'), items, overviewFilter, true);
+  renderPacingRisk(document.getElementById('ovRisk'), items);
+}
+function renderOverviewTab_refresh(){
+  const wrap = document.getElementById('tabContent');
+  wrap.innerHTML = "";
+  renderOverviewTab(wrap);
+}
+
+function renderLedgerInto(container, items, filter, showClassTag){
+  let filtered = items;
+  if(filter && filter!=="all" && filter!=="high" && filter!=="week"){
+    filtered = items.filter(i=>i.classId===filter);
+  } else if(filter==="high"){
+    filtered = items.filter(i=>i.weight>=15);
+  } else if(filter==="week"){
+    filtered = items.filter(i=>{ const d=daysUntil(i.date); return d>=0 && d<=7; });
+  }
+  if(filtered.length===0){
+    container.innerHTML = `<div class="empty-state">Nothing here yet.</div>`;
+    return;
+  }
+  container.innerHTML = filtered.map(item=>{
+    const dd = daysUntil(item.date);
+    const done = completed.has(item.id);
+    const urg = done ? "green" : urgencyClass(dd);
+    const dateFmt = new Date(item.date+"T00:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"});
+    return `
+      <div class="item ${done?'done':''}" data-id="${item.id}">
+        <div class="check" data-id="${item.id}">${done?"✓":""}</div>
+        ${showClassTag ? `<div><span class="tag" style="background:${item.color}">${item.className}</span></div>` : `<div></div>`}
+        <div class="name">${item.name}</div>
+        <div class="weight-tag ${item.weight>=15?'high':''}">${item.weight?item.weight+"%":""}</div>
+        <div>${dateFmt}</div>
+        <div class="urgency ${urg}">${done?"Done":dd<0?"Past":dd+"d left"}</div>
+      </div>
+    `;
+  }).join("");
+  container.querySelectorAll('.check').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.dataset.id;
+      if(completed.has(id)) completed.delete(id); else completed.add(id);
+      saveCompleted();
+      renderTabContent();
+    });
+  });
+}
+
+function renderPacingRisk(container, items){
+  // group by ISO week
+  const weekMap = {};
+  items.forEach(i=>{
+    const d = new Date(i.date+"T00:00:00");
+    const onejan = new Date(d.getFullYear(),0,1);
+    const week = Math.ceil((((d-onejan)/86400000) + onejan.getDay()+1)/7);
+    const key = d.getFullYear()+"-W"+week;
+    if(!weekMap[key]) weekMap[key] = {items:[], start:d};
+    if(d < weekMap[key].start) weekMap[key].start = d;
+    weekMap[key].items.push(i);
+  });
+  const risky = Object.values(weekMap)
+    .map(w=>{
+      const classesInvolved = new Set(w.items.map(i=>i.classId));
+      const highStakes = w.items.filter(i=>i.weight>=15).length;
+      const score = highStakes*2 + (classesInvolved.size>1?classesInvolved.size:0) + w.items.length*0.3;
+      return {...w, classesInvolved, highStakes, score};
+    })
+    .filter(w=> w.items.length>=2 && (w.highStakes>=1 || w.classesInvolved.size>1))
+    .sort((a,b)=> b.score-a.score)
+    .slice(0,5)
+    .sort((a,b)=> a.start-b.start);
+
+  if(risky.length===0){
+    container.innerHTML = `<div class="risk-empty">No overlapping high-stakes weeks detected yet — add more classes or deadlines to see pacing risk.</div>`;
+    return;
+  }
+  container.innerHTML = `<div class="risk-grid">${risky.map(w=>{
+    const endDate = new Date(w.start); endDate.setDate(endDate.getDate()+6);
+    const fmt = d=> d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+    const names = w.items.map(i=>i.name).slice(0,3).join(", ");
+    return `
+      <div class="risk-card">
+        <div class="wk">${fmt(w.start)} – ${fmt(endDate)}</div>
+        <p>${w.items.length} items across ${w.classesInvolved.size} class${w.classesInvolved.size>1?'es':''}${w.highStakes?`, ${w.highStakes} high-stakes`:''}: ${names}${w.items.length>3?"…":""}</p>
+      </div>
+    `;
+  }).join("")}</div>`;
+}
+
+/* ---------- CLASS TAB ---------- */
+function renderClassTab(wrap, cls){
+  const targetRaw = targets.perClass[cls.id] || "A";
+  const targetPct = letterToPct(targetRaw);
+  const floorPct = targets.gpaFloor ? gpaFloorToPct(targets.gpaFloor) : null;
+  const standing = computeStanding(cls);
+  const needStretch = requiredRemaining(cls, targetPct);
+  const needFloor = floorPct!==null ? requiredRemaining(cls, floorPct) : null;
+
+  let statusClass, statusLabel;
+  if(standing.currentPct===null){ statusClass="nodata"; statusLabel="No Grades Yet"; }
+  else{
+    const bar = floorPct!==null ? floorPct : targetPct;
+    if(standing.currentPct >= bar) { statusClass="above"; statusLabel="Above Target"; }
+    else if(needFloor!==null && needFloor<=100){ statusClass = (needFloor > standing.currentPct+8) ? "action" : "track"; statusLabel = statusClass==="action" ? "Action Required" : "On Track"; }
+    else { statusClass="action"; statusLabel="Action Required"; }
+  }
+
+  const section = document.createElement('div');
+  section.innerHTML = `
+    <div class="course-card" style="--course-color:${cls.color}">
+      <div class="cc-head">
+        <div><h3>${cls.name}</h3><div class="full">${cls.categories.length} grading categories</div></div>
+        <span class="pill ${statusClass}">${statusLabel}</span>
+      </div>
+      <div class="standing-row">
+        <span class="pct">${standing.currentPct!==null? standing.currentPct.toFixed(1)+"%" : "—"}</span>
+        <span class="letter">${standing.currentPct!==null? letterFor(standing.currentPct) : "no data"}</span>
+      </div>
+      <div style="padding:0 18px;">
+        <div class="field-row" style="margin-bottom:8px;">
+          <label style="width:auto;">Stretch goal</label>
+          <select id="stretchSelect-${cls.id}" style="border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12.5px;">
+            ${["A","A-","B+","B","B-","C+","C"].map(l=>`<option value="${l}" ${targetRaw===l?'selected':''}>${l}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      ${cls.categories.map(cat=>`
+        <div class="cat-row">
+          <span>${cat.label}</span>
+          <span class="wt">${cat.weight}%</span>
+          <input type="number" min="0" max="100" placeholder="—" data-cat="${cat.label}" value="${cls.scores?.[cat.label] ?? ""}">
+        </div>
+      `).join("")}
+      <div class="buffer-box">
+        ${standing.remainingWeight<=0
+          ? `<b>All categories entered.</b> Final standing: ${standing.currentPct.toFixed(1)}%.`
+          : bufferMessage(needStretch, standing.remainingWeight, targetRaw+" stretch goal")
+          + (floorPct!==null ? ` &nbsp;·&nbsp; ${bufferMessage(needFloor, standing.remainingWeight, "your "+targets.gpaFloor+" floor", true)}` : ``)
+        }
+      </div>
+      <div class="cc-footer">
+        <button class="btn btn-ghost btn-sm" id="reuploadBtn-${cls.id}">Re-upload revised syllabus</button>
+        <button class="btn btn-ghost btn-sm" id="deleteClassBtn-${cls.id}" style="color:var(--crimson-text);">Remove class</button>
+      </div>
+    </div>
+
+    <div class="section-title"><h2>${cls.name} Deadlines</h2><div class="rule"></div></div>
+    <button class="add-assignment-toggle" id="addAssignToggle-${cls.id}" type="button">+ Add assignment (quiz, date change, single item)</button>
+    <div class="add-assignment-form hide" id="addAssignForm-${cls.id}">
+      <div class="aa-grid">
+        <div class="aa-field"><label>Name</label><input type="text" id="aaName-${cls.id}" placeholder="e.g. Pop quiz"></div>
+        <div class="aa-field"><label>Due date</label><input type="date" id="aaDate-${cls.id}"></div>
+        <div class="aa-field" style="max-width:110px;"><label>Weight %</label><input type="number" id="aaWeight-${cls.id}" min="0" max="100" placeholder="0"></div>
+      </div>
+      <div class="aa-actions" style="margin-top:10px;">
+        <button class="btn btn-primary btn-sm" id="aaSave-${cls.id}" type="button">Save assignment</button>
+        <button class="btn btn-ghost btn-sm" id="aaCancel-${cls.id}" type="button">Cancel</button>
+      </div>
+    </div>
+    <div class="filters" id="classFilters-${cls.id}">
+      <button data-f="${cls.id}" class="active">All</button>
+      <button data-f="high">High-Stakes ≥15%</button>
+      <button data-f="week">Next 7 Days</button>
+    </div>
+    <div class="ledger" id="classLedger-${cls.id}"></div>
+  `;
+  wrap.appendChild(section);
+
+  const aaToggle = document.getElementById(`addAssignToggle-${cls.id}`);
+  const aaForm = document.getElementById(`addAssignForm-${cls.id}`);
+  aaToggle.addEventListener('click', ()=>{
+    aaForm.classList.toggle('hide');
+    if(!aaForm.classList.contains('hide')) document.getElementById(`aaName-${cls.id}`).focus();
+  });
+  document.getElementById(`aaCancel-${cls.id}`).addEventListener('click', ()=>{
+    aaForm.classList.add('hide');
+    document.getElementById(`aaName-${cls.id}`).value = "";
+    document.getElementById(`aaDate-${cls.id}`).value = "";
+    document.getElementById(`aaWeight-${cls.id}`).value = "";
+  });
+  document.getElementById(`aaSave-${cls.id}`).addEventListener('click', ()=>{
+    const name = document.getElementById(`aaName-${cls.id}`).value.trim();
+    const date = document.getElementById(`aaDate-${cls.id}`).value;
+    const weight = Number(document.getElementById(`aaWeight-${cls.id}`).value) || 0;
+    if(!name || !date){ showToast("Give the assignment a name and a due date."); return; }
+    cls.assignments = cls.assignments || [];
+    cls.assignments.push({id:uid(), name, date, weight});
+    saveClasses();
+    showToast(`${name} added ✓`);
+    renderTabContent();
+  });
+
+  document.getElementById(`stretchSelect-${cls.id}`).addEventListener('change', e=>{
+    targets.perClass[cls.id] = e.target.value; saveTargets(); renderTabContent();
+  });
+  section.querySelectorAll('input[data-cat]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      cls.scores = cls.scores || {};
+      cls.scores[e.target.dataset.cat] = e.target.value===""? null : Number(e.target.value);
+      saveClasses();
+      renderTabContent();
+    });
+  });
+  document.getElementById(`deleteClassBtn-${cls.id}`).addEventListener('click', ()=>{
+    if(confirm(`Remove ${cls.name}? This can't be undone unless you have an exported backup.`)){
+      // Delete the class itself, its target setting, AND its checklist state —
+      // leaving completed-assignment IDs behind would silently leak storage forever
+      // (they'd never be reachable again once the class and its assignments are gone).
+      const assignmentIds = new Set((cls.assignments||[]).map(a=>a.id));
+      classes = classes.filter(c=>c.id!==cls.id);
+      delete targets.perClass[cls.id];
+      let completedChanged = false;
+      assignmentIds.forEach(id=>{
+        if(completed.has(id)){ completed.delete(id); completedChanged = true; }
+      });
+      saveClasses(); saveTargets();
+      if(completedChanged) saveCompleted();
+      activeTab = "overview";
+      showToast(`${cls.name} removed`);
+      renderApp();
+    }
+  });
+  document.getElementById(`reuploadBtn-${cls.id}`).addEventListener('click', ()=>{
+    draftClasses.push({_id:uid(), stage:"upload", parsed:null, fileName:null, _mergeInto: cls.id});
+    document.getElementById('dashboard').classList.add('hide');
+    document.getElementById('onboarding').classList.remove('hide');
+    renderOnboarding();
+  });
+
+  const classItems = (cls.assignments||[]).map(a=>({...a, classId:cls.id, className:cls.name, color:cls.color}));
+  let cf = cls.id;
+  const filtBtns = section.querySelectorAll(`#classFilters-${cls.id} button`);
+  filtBtns.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      filtBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const f = btn.dataset.f;
+      renderLedgerInto(document.getElementById(`classLedger-${cls.id}`), classItems, f==="high"||f==="week" ? f : cls.id, false);
+    });
+  });
+  renderLedgerInto(document.getElementById(`classLedger-${cls.id}`), classItems, cls.id, false);
+}
+
+function gpaFloorToPct(floorStr){
+  const n = parseFloat(floorStr);
+  if(isNaN(n)) return null;
+  if(n<=4.0){ // treat as GPA scale
+    const table = [[4.0,97],[3.7,93],[3.3,90],[3.0,87],[2.7,83],[2.3,80],[2.0,77],[1.7,73],[1.3,70],[1.0,67],[0.0,60]];
+    for(const [gpa,pct] of table){ if(n>=gpa) return pct; }
+    return 60;
+  }
+  return n; // already a percentage
+}
+
+/* ---------- PWA: SERVICE WORKER REGISTRATION ---------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{
+      // Non-fatal: app still works online, just won't cache the shell for offline use.
+    });
+  });
+}
+
+/* ---------- PWA: ADD TO HOME SCREEN BANNER ---------- */
+let deferredInstallPrompt = null;
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+const INSTALL_DISMISS_KEY = "syllabusSync:installBannerDismissed";
+
+function installBannerDismissed(){
+  try{ return localStorage.getItem(INSTALL_DISMISS_KEY) === "1"; }catch(e){ return false; }
+}
+function dismissInstallBanner(){
+  try{ localStorage.setItem(INSTALL_DISMISS_KEY, "1"); }catch(e){}
+  document.getElementById('installBanner').classList.add('hide');
+}
+
+// Android/Chrome: fires when the browser is willing to show its own install prompt.
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showInstallBanner('android');
+});
+
+function showInstallBanner(kind){
+  if(isStandalone || installBannerDismissed()) return;
+  const el = document.getElementById('installBanner');
+  if(kind === 'ios'){
+    el.innerHTML = `
+      <div class="ib-icon">S</div>
+      <div class="ib-body"><b>Install Syllabus Sync</b>Tap the Share icon <span style="font-weight:800;">⎋</span> below, then "Add to Home Screen" — it opens like a real app, full screen, no browser bar.</div>
+      <div class="ib-actions"><button class="ib-dismiss" id="ibDismiss">Got it</button></div>
+    `;
+  } else {
+    el.innerHTML = `
+      <div class="ib-icon">S</div>
+      <div class="ib-body"><b>Install Syllabus Sync</b>Add it to your home screen for one-tap access, full screen, no browser bar.</div>
+      <div class="ib-actions">
+        <button class="ib-install" id="ibInstall">Install</button>
+        <button class="ib-dismiss" id="ibDismiss">Not now</button>
+      </div>
+    `;
+  }
+  el.classList.remove('hide');
+  const dismissBtn = document.getElementById('ibDismiss');
+  if(dismissBtn) dismissBtn.addEventListener('click', dismissInstallBanner);
+  const installBtn = document.getElementById('ibInstall');
+  if(installBtn) installBtn.addEventListener('click', async ()=>{
+    if(!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    document.getElementById('installBanner').classList.add('hide');
+  });
+}
+
+// iOS Safari never fires beforeinstallprompt, so surface manual instructions instead,
+// after a short delay so it doesn't compete with the onboarding flow on first paint.
+if(isIOS && !isStandalone){
+  setTimeout(()=> showInstallBanner('ios'), 2500);
+}
+
+/* ---------- INIT ---------- */
+(async function init(){
+  await loadState();
+  renderTopActions();
+  if(classes.length===0){
+    renderOnboarding();
+  } else {
+    renderApp();
+  }
+})();
+</script>
+</body>
+</html>
